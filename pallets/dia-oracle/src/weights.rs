@@ -140,7 +140,7 @@ impl WeightInfo for () {
 	// Storage: DiaOracle AuthorizedAccounts (r:1 w:0)
 	// Storage: DiaOracle CoinInfosMap (r:0 w:1)
 	fn set_updated_coin_infos() -> Weight {
-		Weight::from_ref_time(1_152_148_682_000)
+		Weight::from_ref_time(1_241_248_000)
 			.saturating_add(RocksDbWeight::get().reads(1))
 			.saturating_add(RocksDbWeight::get().writes(1))
 	}
