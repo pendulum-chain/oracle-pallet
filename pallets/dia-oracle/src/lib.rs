@@ -375,14 +375,14 @@ pub mod pallet {
 		pub fn set_updated_coin_infos(
 			origin: OriginFor<T>,
 			coin_infos: Vec<((Vec<u8>, Vec<u8>), CoinInfo)>,
-		) -> DispatchResult {
+		) -> DispatchResultWithPostInfo {
 			let origin_account_id = ensure_signed(origin)?;
 			Pallet::<T>::check_origin_rights(&origin_account_id)?;
 			Self::deposit_event(Event::<T>::UpdatedPrices(coin_infos.clone()));
 			for ((blockchain, symbol), c) in coin_infos {
 				<CoinInfosMap<T>>::insert(AssetId { blockchain, symbol }, c);
 			}
-			Ok(())
+			Ok(Pays::No.into())
 		}
 
 		#[pallet::weight(<T as Config>::WeightInfo::set_batching_api())]
