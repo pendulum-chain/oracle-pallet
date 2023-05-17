@@ -7,7 +7,7 @@ use jsonrpsee::{
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_core::Bytes;
-use sp_runtime::{generic::BlockId, traits::Block as BlockT};
+use sp_runtime::traits::Block as BlockT;
 
 pub use dia_oracle_runtime_api::DiaOracleApi as DiaOracleRuntimeApi;
 
@@ -75,12 +75,12 @@ where
 		at: Option<<Block as BlockT>::Hash>,
 	) -> RpcResult<CoinInfo> {
 		let api = self.client.runtime_api();
-		let at = BlockId::hash(at.unwrap_or_else(||
+		let at = at.unwrap_or_else(||
 			// If the block hash is not supplied assume the best block.
-			self.client.info().best_hash));
+			self.client.info().best_hash);
 
 		let r = api
-			.get_coin_info(&at, blockchain.to_vec(), symbol.to_vec())
+			.get_coin_info(at, blockchain.to_vec(), symbol.to_vec())
 			.map_err(|e| {
 				CallError::Custom(ErrorObject::owned(
 					Error::RuntimeError.into(),
@@ -106,12 +106,12 @@ where
 		at: Option<<Block as BlockT>::Hash>,
 	) -> RpcResult<PriceInfo> {
 		let api = self.client.runtime_api();
-		let at = BlockId::hash(at.unwrap_or_else(||
+		let at = at.unwrap_or_else(||
 			// If the block hash is not supplied assume the best block.
-			self.client.info().best_hash));
+			self.client.info().best_hash);
 
 		let r = api
-			.get_value(&at, blockchain.to_vec(), symbol.to_vec())
+			.get_value(at, blockchain.to_vec(), symbol.to_vec())
 			.map_err(|e| {
 				CallError::Custom(ErrorObject::owned(
 					Error::RuntimeError.into(),
