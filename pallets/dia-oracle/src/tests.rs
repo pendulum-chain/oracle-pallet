@@ -1,5 +1,4 @@
-use crate::mock::*;
-use crate::*;
+use crate::{mock::*, *};
 
 use frame_support::assert_err;
 use sp_core::sr25519::Public;
