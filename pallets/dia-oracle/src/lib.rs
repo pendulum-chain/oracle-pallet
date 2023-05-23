@@ -87,7 +87,6 @@ pub mod pallet {
 	}
 
 	#[pallet::pallet]
-	#[pallet::generate_store(pub(super) trait Store)]
 	#[pallet::without_storage_info]
 	pub struct Pallet<T>(_);
 
@@ -238,7 +237,7 @@ pub mod pallet {
 				.join(&b',');
 
 			if supported_currencies.len() == 0 {
-				return Ok(());
+				return Ok(())
 			}
 
 			let supported_currencies: Vec<_> =
