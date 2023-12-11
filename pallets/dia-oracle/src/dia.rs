@@ -1,7 +1,7 @@
 use codec::{Decode, Encode};
 use frame_support::{sp_runtime::DispatchError, sp_std::vec::Vec};
 use serde::{Deserialize, Deserializer, Serialize};
-
+use scale_info::TypeInfo;
 #[cfg(feature = "std")]
 use serde::Serializer;
 
@@ -17,7 +17,7 @@ pub trait DiaOracle {
 #[derive(
 	Encode,
 	Decode,
-	scale_info::TypeInfo,
+	TypeInfo,
 	Debug,
 	Clone,
 	PartialEq,
@@ -59,7 +59,7 @@ impl AssetId {
 	}
 }
 
-#[derive(Eq, PartialEq, Encode, Decode, Default)]
+#[derive(Eq, PartialEq, Encode, Decode, Default, TypeInfo)]
 #[cfg_attr(feature = "std", derive(Debug))]
 pub struct PriceInfo {
 	pub value: u128,
