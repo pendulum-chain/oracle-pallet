@@ -87,7 +87,6 @@ pub mod pallet {
 	}
 
 	#[pallet::pallet]
-	#[pallet::generate_store(pub(super) trait Store)]
 	#[pallet::without_storage_info]
 	pub struct Pallet<T>(_);
 
@@ -238,7 +237,7 @@ pub mod pallet {
 				.join(&b',');
 
 			if supported_currencies.len() == 0 {
-				return Ok(());
+				return Ok(())
 			}
 
 			let supported_currencies: Vec<_> =
@@ -296,6 +295,7 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
+		#[pallet::call_index(0)]
 		#[pallet::weight(<T as Config>::WeightInfo::add_currency())]
 		pub fn add_currency(
 			origin: OriginFor<T>,
@@ -314,6 +314,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		#[pallet::call_index(1)]
 		#[pallet::weight(<T as Config>::WeightInfo::remove_currency())]
 		pub fn remove_currency(
 			origin: OriginFor<T>,
@@ -332,6 +333,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		#[pallet::call_index(2)]
 		#[pallet::weight(<T as Config>::WeightInfo::authorize_account())]
 		pub fn authorize_account(origin: OriginFor<T>, account_id: T::AccountId) -> DispatchResult {
 			if let Ok(origin_account_id) = ensure_signed(origin.clone()) {
@@ -348,6 +350,7 @@ pub mod pallet {
 			Ok(())
 		}
 
+		#[pallet::call_index(3)]
 		#[pallet::weight(<T as Config>::WeightInfo::deauthorize_account())]
 		pub fn deauthorize_account(
 			origin: OriginFor<T>,
@@ -371,20 +374,22 @@ pub mod pallet {
 			Ok(())
 		}
 
+		#[pallet::call_index(4)]
 		#[pallet::weight(<T as Config>::WeightInfo::set_updated_coin_infos())]
 		pub fn set_updated_coin_infos(
 			origin: OriginFor<T>,
 			coin_infos: Vec<((Vec<u8>, Vec<u8>), CoinInfo)>,
-		) -> DispatchResult {
+		) -> DispatchResultWithPostInfo {
 			let origin_account_id = ensure_signed(origin)?;
 			Pallet::<T>::check_origin_rights(&origin_account_id)?;
 			Self::deposit_event(Event::<T>::UpdatedPrices(coin_infos.clone()));
 			for ((blockchain, symbol), c) in coin_infos {
 				<CoinInfosMap<T>>::insert(AssetId { blockchain, symbol }, c);
 			}
-			Ok(())
+			Ok(Pays::No.into())
 		}
 
+		#[pallet::call_index(5)]
 		#[pallet::weight(<T as Config>::WeightInfo::set_batching_api())]
 		pub fn set_batching_api(origin: OriginFor<T>, api: Vec<u8>) -> DispatchResult {
 			let origin_account_id = ensure_signed(origin)?;
