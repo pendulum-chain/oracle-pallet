@@ -59,14 +59,15 @@ pub mod pallet {
 		dispatch::DispatchResult,
 		pallet_prelude::*,
 		sp_runtime::offchain,
-		sp_std,
-		sp_std::{vec, vec::Vec},
 	};
+	use sp_std;
+	use sp_std::{vec, vec::Vec};
 	use frame_system::{
 		ensure_root, ensure_signed,
 		offchain::{AppCrypto, CreateSignedTransaction, SendSignedTransaction, Signer},
 		pallet_prelude::*,
 	};
+	
 
 	const BATCHING_ENDPOINT_FALLBACK: [u8; 31] = *b"http://0.0.0.0:8070/currencies/";
 
@@ -169,20 +170,19 @@ pub mod pallet {
 	}
 
 	#[pallet::genesis_build]
-	impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
+	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
 		fn build(&self) {
 			for asset_id in &self.supported_currencies {
-				<SupportedCurrencies<T>>::insert(asset_id.clone(), ());
+				<SupportedCurrencies<T>>::insert(asset_id, ());
 			}
 
 			for account_id in &self.authorized_accounts {
-				<AuthorizedAccounts<T>>::insert(account_id.clone(), ());
+				<AuthorizedAccounts<T>>::insert(account_id, ());
 			}
 			<BatchingApi<T>>::put(self.batching_api.clone());
 		}
 	}
 
-	#[cfg(feature = "std")]
 	impl<T: Config> Default for GenesisConfig<T> {
 		fn default() -> Self {
 			Self {
@@ -196,7 +196,7 @@ pub mod pallet {
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		fn offchain_worker(_n: T::BlockNumber) {
+		fn offchain_worker(_n: BlockNumberFor<T>) {
 			match Self::update_prices() {
 				Ok(_) => log::info!("Updated Prices"),
 				Err(e) => log::error!("Failed to Update Prices {:?}", e),

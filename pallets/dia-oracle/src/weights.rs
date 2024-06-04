@@ -31,7 +31,7 @@
 #![allow(unused_imports)]
 
 use frame_support::{traits::Get, weights::{Weight,constants::RocksDbWeight}};
-use frame_support::sp_std::marker::PhantomData;
+use sp_std::marker::PhantomData;
 
 /// Weight functions for `dia_oracle`.
 ///
@@ -51,49 +51,49 @@ impl<T: frame_system::Config> WeightInfo for DiaWeightInfo<T> {
 	// Storage: DiaOracle AuthorizedAccounts (r:1 w:0)
 	// Storage: DiaOracle SupportedCurrencies (r:1 w:1)
 	fn add_currency() -> Weight {
-		Weight::from_ref_time(1_494_649_000)
+		Weight::from_parts(1_494_649_000, 0)
 			.saturating_add(T::DbWeight::get().reads(2))
 			.saturating_add(T::DbWeight::get().writes(1))
 	}
 	// Storage: DiaOracle AuthorizedAccounts (r:1 w:0)
 	// Storage: DiaOracle SupportedCurrencies (r:1 w:0)
 	fn remove_currency() -> Weight {
-		Weight::from_ref_time(542_550_000)
+		Weight::from_parts(542_550_000, 0)
 			.saturating_add(T::DbWeight::get().reads(2))
 	}
 	// Storage: DiaOracle AuthorizedAccounts (r:1 w:1)
 	fn authorize_account() -> Weight {
-		Weight::from_ref_time(1_241_248_000)
+		Weight::from_parts(1_241_248_000, 0)
 			.saturating_add(T::DbWeight::get().reads(1))
 			.saturating_add(T::DbWeight::get().writes(1))
 	}
 	// Storage: DiaOracle AuthorizedAccounts (r:2 w:1)
 	fn authorize_account_signed() -> Weight {
-		Weight::from_ref_time(1_525_600_000)
+		Weight::from_parts(1_525_600_000, 0)
 			.saturating_add(T::DbWeight::get().reads(2))
 			.saturating_add(T::DbWeight::get().writes(1))
 	}
 	// Storage: DiaOracle AuthorizedAccounts (r:1 w:0)
 	fn deauthorize_account() -> Weight {
-		Weight::from_ref_time(276_664_000)
+		Weight::from_parts(276_664_000, 0)
 			.saturating_add(T::DbWeight::get().reads(1))
 	}
 	// Storage: DiaOracle AuthorizedAccounts (r:2 w:1)
 	fn deauthorize_account_signed() -> Weight {
-		Weight::from_ref_time(1_513_398_000)
+		Weight::from_parts(1_513_398_000, 0)
 			.saturating_add(T::DbWeight::get().reads(2))
 			.saturating_add(T::DbWeight::get().writes(1))
 	}
 	// Storage: DiaOracle AuthorizedAccounts (r:1 w:0)
 	// Storage: DiaOracle CoinInfosMap (r:0 w:1)
 	fn set_updated_coin_infos() -> Weight {
-		Weight::from_ref_time(1_241_248_000)
+		Weight::from_parts(1_241_248_000, 0)
 			.saturating_add(T::DbWeight::get().reads(1))
 			.saturating_add(T::DbWeight::get().writes(1))
 	}
 
 	fn set_batching_api() -> Weight {
-		Weight::from_ref_time(1_241_248_000)
+		Weight::from_parts(1_241_248_000, 0)
 			.saturating_add(T::DbWeight::get().reads(1))
 			.saturating_add(T::DbWeight::get().writes(1))
 	}
@@ -104,49 +104,49 @@ impl WeightInfo for () {
 	// Storage: DiaOracle AuthorizedAccounts (r:1 w:0)
 	// Storage: DiaOracle SupportedCurrencies (r:1 w:1)
 	fn add_currency() -> Weight {
-		Weight::from_ref_time(1_494_649_000)
+		Weight::from_parts(1_494_649_000, 0)
 			.saturating_add(RocksDbWeight::get().reads(2))
 			.saturating_add(RocksDbWeight::get().writes(1))
 	}
 	// Storage: DiaOracle AuthorizedAccounts (r:1 w:0)
 	// Storage: DiaOracle SupportedCurrencies (r:1 w:0)
 	fn remove_currency() -> Weight {
-		Weight::from_ref_time(542_550_000)
+		Weight::from_parts(542_550_000, 0)
 			.saturating_add(RocksDbWeight::get().reads(2))
 	}
 	// Storage: DiaOracle AuthorizedAccounts (r:1 w:1)
 	fn authorize_account() -> Weight {
-		Weight::from_ref_time(1_241_248_000)
+		Weight::from_parts(1_241_248_000, 0)
 			.saturating_add(RocksDbWeight::get().reads(1))
 			.saturating_add(RocksDbWeight::get().writes(1))
 	}
 	// Storage: DiaOracle AuthorizedAccounts (r:2 w:1)
 	fn authorize_account_signed() -> Weight {
-		Weight::from_ref_time(1_525_600_000)
+		Weight::from_parts(1_525_600_000, 0)
 			.saturating_add(RocksDbWeight::get().reads(2))
 			.saturating_add(RocksDbWeight::get().writes(1))
 	}
 	// Storage: DiaOracle AuthorizedAccounts (r:1 w:0)
 	fn deauthorize_account() -> Weight {
-		Weight::from_ref_time(276_664_000)
+		Weight::from_parts(276_664_000, 0)
 			.saturating_add(RocksDbWeight::get().reads(1))
 	}
 	// Storage: DiaOracle AuthorizedAccounts (r:2 w:1)
 	fn deauthorize_account_signed() -> Weight {
-		Weight::from_ref_time(1_513_398_000)
+		Weight::from_parts(1_513_398_000, 0)
 			.saturating_add(RocksDbWeight::get().reads(2))
 			.saturating_add(RocksDbWeight::get().writes(1))
 	}
 	// Storage: DiaOracle AuthorizedAccounts (r:1 w:0)
 	// Storage: DiaOracle CoinInfosMap (r:0 w:1)
 	fn set_updated_coin_infos() -> Weight {
-		Weight::from_ref_time(1_241_248_000)
+		Weight::from_parts(1_241_248_000, 0)
 			.saturating_add(RocksDbWeight::get().reads(1))
 			.saturating_add(RocksDbWeight::get().writes(1))
 	}
 
 	fn set_batching_api() -> Weight {
-		Weight::from_ref_time(1_241_248_000)
+		Weight::from_parts(1_241_248_000, 0)
 			.saturating_add(RocksDbWeight::get().reads(1))
 			.saturating_add(RocksDbWeight::get().writes(1))
 	}

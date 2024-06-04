@@ -3,10 +3,8 @@ panic = 'unwind'
 
 [workspace]
 members = [
-    'node',
     "dia-batching-server",
     'pallets/dia-oracle',
     'pallets/dia-oracle/rpc',
     'pallets/dia-oracle/rpc/runtime-api',
-    'runtime',
 ]
