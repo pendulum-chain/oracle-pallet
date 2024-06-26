@@ -18,12 +18,12 @@ impl CustomPriceApi {
             return AmpePriceView::get_price().await;
         }
 
-        Err("Unsupported asset".into())
+        Err("Unsupported custom asset".into())
     }
 
     pub fn is_supported(asset: &AssetSpecifier) -> bool {
         let custom_assets: Vec<AssetSpecifier> = vec![AssetSpecifier {
-            blockchain: "Amplitude".to_string(),
+            blockchain: "CRYPTO".to_string(),
             symbol: "AMPE".to_string(),
         }];
 
@@ -111,10 +111,10 @@ mod tests {
         let prices = price_api.get_quotations(assets).await.expect("should return a quotation");
 
         assert!(!prices.is_empty());
-        let ampe_price = prices.first().expect("should return a price").clone();
+        let ampe_quote = prices.first().expect("should return a price").clone();
 
-        assert_eq!(ampe_price.symbol, asset.symbol);
-        assert_eq!(ampe_price.blockchain.expect("should return something"), asset.blockchain);
-        assert!(ampe_price.price > Decimal::new(0, 0));
+        assert_eq!(ampe_quote.symbol, "AMPE");
+        assert_eq!(ampe_quote.blockchain.expect("should return something"), "Amplitude");
+        assert!(ampe_quote.price > Decimal::new(0, 0));
     }
 }

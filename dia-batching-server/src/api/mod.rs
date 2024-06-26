@@ -61,9 +61,21 @@ impl PriceApi for PriceApiImpl {
         // let quotations = quotations?.into_iter().flatten().collect();
         //
         let mut quotations = Vec::new();
-        quotations.append(&mut self.get_fiat_quotations(assets.clone()).await?);
-        quotations.append(&mut self.get_crypto_quotations(assets.clone()).await?);
-        quotations.append(&mut self.get_custom_quotations(assets.clone()).await?);
+
+        let fiat_quotes = self.get_fiat_quotations(assets.clone()).await;
+        if let Ok(fiat_quotes) = fiat_quotes {
+            quotations.extend(fiat_quotes);
+        }
+
+        let crypto_quotes = self.get_crypto_quotations(assets.clone()).await;
+        if let Ok(crypto_quotes) = crypto_quotes {
+            quotations.extend(crypto_quotes);
+        }
+
+        let custom_quotes = self.get_custom_quotations(assets.clone()).await;
+        if let Ok(custom_quotes) = custom_quotes {
+            quotations.extend(custom_quotes);
+        }
         Ok(quotations)
     }
 }
