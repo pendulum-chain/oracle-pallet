@@ -64,9 +64,10 @@ mod tests {
 
 		let mut app =
 			test::init_service(App::new().app_data(data.clone()).service(currencies_post)).await;
+		let vec: Vec<Currency> = vec![];
 		let req = test::TestRequest::post()
 			.uri("http://localhost:8080/currencies")
-			.set_json::<Vec<Currency>>(&vec![])
+			.set_json(vec)
 			.to_request();
 
 		let resp = test::call_service(&mut app, req).await;
@@ -131,9 +132,10 @@ mod tests {
 
 		let mut app =
 			test::init_service(App::new().app_data(data.clone()).service(currencies_post)).await;
+		let vec: Vec<Currency> = vec![];
 		let req = test::TestRequest::post()
 			.uri("http://localhost:8080/currencies")
-			.set_json::<Vec<Currency>>(&vec![])
+			.set_json(vec)
 			.to_request();
 
 		let resp = test::call_service(&mut app, req).await;
@@ -153,7 +155,7 @@ mod tests {
 			test::init_service(App::new().app_data(data.clone()).service(currencies_post)).await;
 		let req = test::TestRequest::post()
 			.uri("http://localhost:8080/currencies")
-			.set_json(&vec![Currency { blockchain: "Bitcoin".into(), symbol: "$COIN".into() }])
+			.set_json(vec![Currency { blockchain: "Bitcoin".into(), symbol: "$COIN".into() }])
 			.to_request();
 
 		let resp = test::call_service(&mut app, req).await;

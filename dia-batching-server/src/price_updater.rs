@@ -276,7 +276,7 @@ mod tests {
 						decimals: 8,
 						blockchain: "Bitcoin".into(),
 					},
-					volume: Decimal::new(3818975389095178, 6),
+					volume: 3818975389095178_f64,
 				},
 				QuotedAsset {
 					asset: Asset {
@@ -286,7 +286,7 @@ mod tests {
 						decimals: 18,
 						blockchain: "Ethereum".into(),
 					},
-					volume: Decimal::new(791232743889491, 6),
+					volume: 791232743889491_f64,
 				},
 				QuotedAsset {
 					asset: Asset {
@@ -296,7 +296,7 @@ mod tests {
 						decimals: 6,
 						blockchain: "Ethereum".into(),
 					},
-					volume: Decimal::new(294107237463418, 6),
+					volume: 294107237463418_f64,
 				},
 				QuotedAsset {
 					asset: Asset {
@@ -306,7 +306,7 @@ mod tests {
 						decimals: 6,
 						blockchain: "Ethereum".into(),
 					},
-					volume: Decimal::new(205584209531937, 6),
+					volume: 205584209531937_f64,
 				},
 			])
 		}
