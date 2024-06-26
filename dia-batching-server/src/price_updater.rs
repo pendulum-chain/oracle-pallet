@@ -11,7 +11,6 @@ use std::{error::Error, sync::Arc};
 pub async fn run_update_prices_loop<T>(
 	storage: Arc<CoinInfoStorage>,
 	maybe_supported_currencies: Option<HashSet<AssetSpecifier>>,
-	rate: std::time::Duration,
 	duration: std::time::Duration,
 	api: T,
 ) -> Result<(), Box<dyn Error + Send + Sync + 'static>>
@@ -25,7 +24,7 @@ where
 
 			let coins = Arc::clone(&coins);
 
-			update_prices(coins, &maybe_supported_currencies, &api, rate).await;
+			update_prices(coins, &maybe_supported_currencies, &api).await;
 
 			tokio::time::delay_for(duration.saturating_sub(time_elapsed.elapsed())).await;
 		}
@@ -60,7 +59,6 @@ async fn update_prices<T>(
 	coins: Arc<CoinInfoStorage>,
 	maybe_supported_currencies: &Option<HashSet<AssetSpecifier>>,
 	api: &T,
-	rate: std::time::Duration,
 ) where
 	T: DiaApi + Send + Sync + 'static,
 {
@@ -87,7 +85,6 @@ async fn update_prices<T>(
 						error!("Error while retrieving quotation for {:?}: {}", quotable_asset, err)
 					},
 				}
-				tokio::time::delay_for(rate).await;
 			}
 		}
 	}
@@ -318,7 +315,7 @@ mod tests {
 		let storage = Arc::new(CoinInfoStorage::default());
 		let coins = Arc::clone(&storage);
 		let all_currencies = None;
-		update_prices(coins, &all_currencies, &mock_api, std::time::Duration::from_secs(1)).await;
+		update_prices(coins, &all_currencies, &mock_api).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![
 			Currency { blockchain: "Bitcoin".into(), symbol: "BTC".into() },
@@ -348,7 +345,7 @@ mod tests {
 			.insert(AssetSpecifier { blockchain: "FIAT".into(), symbol: "MXN-USD".into() });
 		let all_currencies = Some(all_currencies);
 
-		update_prices(coins, &all_currencies, &mock_api, std::time::Duration::from_secs(1)).await;
+		update_prices(coins, &all_currencies, &mock_api).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![
 			Currency { blockchain: "Bitcoin".into(), symbol: "BTC".into() },
@@ -373,7 +370,7 @@ mod tests {
 			.insert(AssetSpecifier { blockchain: "FIAT".into(), symbol: "USD-USD".into() });
 		let all_currencies = Some(all_currencies);
 
-		update_prices(coins, &all_currencies, &mock_api, std::time::Duration::from_secs(1)).await;
+		update_prices(coins, &all_currencies, &mock_api).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![Currency {
 			blockchain: "FIAT".into(),
@@ -393,7 +390,7 @@ mod tests {
 		let storage = Arc::new(CoinInfoStorage::default());
 		let coins = Arc::clone(&storage);
 		let all_currencies = None;
-		update_prices(coins, &all_currencies, &mock_api, std::time::Duration::from_secs(1)).await;
+		update_prices(coins, &all_currencies, &mock_api).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![
 			Currency { blockchain: "Bitcoin".into(), symbol: "BTCCash".into() },
@@ -409,7 +406,7 @@ mod tests {
 		let storage = Arc::new(CoinInfoStorage::default());
 		let coins = Arc::clone(&storage);
 		let all_currencies = None;
-		update_prices(coins, &all_currencies, &mock_api, std::time::Duration::from_secs(1)).await;
+		update_prices(coins, &all_currencies, &mock_api).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![
 			Currency { blockchain: "Bitcoin".into(), symbol: "BTC".into() },
@@ -429,7 +426,7 @@ mod tests {
 		let storage = Arc::new(CoinInfoStorage::default());
 		let coins = Arc::clone(&storage);
 		let all_currencies = None;
-		update_prices(coins, &all_currencies, &mock_api, std::time::Duration::from_secs(1)).await;
+		update_prices(coins, &all_currencies, &mock_api).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![]);
 
@@ -443,7 +440,7 @@ mod tests {
 		let coins = Arc::clone(&storage);
 		let all_currencies = None;
 
-		update_prices(coins, &all_currencies, &mock_api, std::time::Duration::from_secs(1)).await;
+		update_prices(coins, &all_currencies, &mock_api).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![Currency {
 			blockchain: "Bitcoin".into(),
@@ -460,7 +457,7 @@ mod tests {
 		let coins = Arc::clone(&storage);
 		let all_currencies = None;
 
-		update_prices(coins, &all_currencies, &mock_api, std::time::Duration::from_secs(1)).await;
+		update_prices(coins, &all_currencies, &mock_api).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![
 			Currency { blockchain: "Bitcoin".into(), symbol: "BTC".into() },

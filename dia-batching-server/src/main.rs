@@ -44,7 +44,6 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 				})
 				.collect()
 		}),
-		std::time::Duration::from_millis(args.request_timeout_in_milliseconds),
 		std::time::Duration::from_secs(args.iteration_timeout_in_seconds),
 		Dia,
 	)

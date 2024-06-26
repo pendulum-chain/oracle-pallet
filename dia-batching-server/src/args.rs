@@ -19,10 +19,6 @@ pub struct DiaApiArgs {
 	#[structopt(short, long, default_value = "10")]
 	pub iteration_timeout_in_seconds: u64,
 
-	/// Timeout after one request
-	#[structopt(short, long, default_value = "100")]
-	pub request_timeout_in_milliseconds: u64,
-
 	/// Currencies to support
 	/// Each currency needs to have the format <blockchain>:<symbol>
 	/// Fiat currencies need to have the format FIAT:<from>-<to>
