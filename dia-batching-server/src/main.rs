@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use crate::dia::Dia;
 use crate::handlers::currencies_post;
 use crate::storage::CoinInfoStorage;
 use std::error::Error;
@@ -9,9 +8,10 @@ use actix_web::{web, App, HttpServer};
 use log::error;
 use std::sync::Arc;
 use structopt::StructOpt;
+use crate::api::PriceApiImpl;
 
+mod api;
 mod args;
-mod dia;
 mod handlers;
 mod price_updater;
 mod storage;
@@ -46,11 +46,13 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         return Ok(());
     }
 
+    let price_api = PriceApiImpl::new();
+
     price_updater::run_update_prices_loop(
         storage,
         supported_currencies,
-        std::time::Duration::from_secs(args.iteration_timeout_in_seconds),
-        Dia,
+        std::time::Duration::from_secs(args.update_interval_seconds),
+        price_api
     ).await?;
 
     println!("Running dia-batching-server... (Press CTRL+C to quit)");
