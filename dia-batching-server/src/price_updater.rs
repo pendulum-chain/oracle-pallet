@@ -37,7 +37,7 @@ fn convert_to_coin_info(value: Quotation) -> Result<CoinInfo, Box<dyn Error + Sy
     let Quotation { name, symbol, blockchain, price, time, .. } = value;
 
     let price = convert_decimal_to_u128(&price)?;
-    let supply = convert_decimal_to_u128(&volume_yesterday)?;
+    let supply = 0;
 
     let coin_info = CoinInfo {
         name: name.into(),
@@ -178,26 +178,22 @@ mod tests {
             );
             quotation.insert(
                 AssetSpecifier { blockchain: "FIAT".into(), symbol: "USD-USD".into() },
-                Quotation::get_default_fiat_usd_quotation(),
+                Quotation {
+                    symbol: "USD-USD".to_string(),
+                    name: "USD-X".to_string(),
+                    blockchain: None,
+                    price: Decimal::new(1, 0),
+                    time: Utc::now(),
+                }
             );
             Self { quotation }
         }
     }
 
     #[async_trait]
-    impl DiaApi for MockDia {
-        async fn get_quotation(
-            &self,
-            asset: &QuotedAsset,
-        ) -> Result<Quotation, Box<dyn Error + Send + Sync>> {
-            let QuotedAsset { asset, volume: _ } = asset;
-            let asset = AssetSpecifier {
-                blockchain: asset.blockchain.clone(),
-                symbol: asset.symbol.clone(),
-            };
-            let quotation =
-                self.quotation.get(&asset).ok_or("Error Finding Quotation".to_string())?;
-            Ok(quotation.clone())
+    impl PriceApi for MockDia {
+        async fn get_quotations(&self, assets: Vec<&AssetSpecifier>) -> Result<Vec<Quotation>, Box<dyn Error + Sync + Send>> {
+            todo!()
         }
     }
 

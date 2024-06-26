@@ -5,7 +5,7 @@ use crate::AssetSpecifier;
 pub struct CoingeckoPriceApi;
 
 impl CoingeckoPriceApi {
-    pub async fn get_price(asset: &AssetSpecifier) -> Result<Quotation, Box<dyn Error + Send + Sync>> {
+    pub async fn get_prices(assets: Vec<&AssetSpecifier>) -> Result<Vec<Quotation>, Box<dyn Error + Send + Sync>> {
         Err("Unsupported asset".into())
     }
 }

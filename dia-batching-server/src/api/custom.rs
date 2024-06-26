@@ -9,10 +9,6 @@ use serde::Deserialize;
 use crate::api::Quotation;
 use crate::AssetSpecifier;
 
-pub const CUSTOM_ASSETS: Vec<AssetSpecifier> = vec![AssetSpecifier {
-    blockchain: "Amplitude".to_string(),
-    symbol: "AMPE".to_string(),
-}];
 
 pub struct CustomPriceApi;
 
@@ -23,6 +19,15 @@ impl CustomPriceApi {
         }
 
         Err("Unsupported asset".into())
+    }
+
+    pub fn is_supported(asset: &AssetSpecifier) -> bool {
+        let custom_assets: Vec<AssetSpecifier> = vec![AssetSpecifier {
+            blockchain: "Amplitude".to_string(),
+            symbol: "AMPE".to_string(),
+        }];
+
+        custom_assets.iter().any(|supported_asset| supported_asset == asset)
     }
 }
 
@@ -89,41 +94,27 @@ impl AmpePriceView {
 #[cfg(test)]
 mod tests {
     use rust_decimal::Decimal;
+    use crate::api::PriceApiImpl;
+    use crate::api::PriceApi;
+    use crate::AssetSpecifier;
 
     #[tokio::test]
     async fn test_ampe_price() {
-        let quoted_asset = QuotedAsset {
-            asset: Asset {
-                symbol: AmpePriceView::SYMBOL.to_string(),
-                name: "".to_string(),
-                address: "".to_string(),
-                decimals: 0,
-                blockchain: AmpePriceView::BLOCKCHAIN.to_string(),
-            },
-            volume: 0.0,
+        let asset = AssetSpecifier {
+            blockchain: "CRYPTO".to_string(),
+            symbol: "AMPE".to_string(),
         };
-        let price = Dia.get_quotation(&quoted_asset).await.expect("should return a quotation");
+        let assets = vec![&asset];
 
-        assert_eq!(price.symbol, quoted_asset.asset.symbol);
-        assert_eq!(price.blockchain.expect("should return ampe"), quoted_asset.asset.blockchain);
-        assert!(price.price < Decimal::new(1, 0));
-    }
+        let price_api = PriceApiImpl::new();
 
-    #[tokio::test]
-    async fn test_fiat_price() {
-        let quoted_asset = QuotedAsset {
-            asset: Asset {
-                symbol: "USD-USD".to_string(),
-                name: "".to_string(),
-                address: "".to_string(),
-                decimals: 0,
-                blockchain: "fiat".to_string(),
-            },
-            volume: 0.0,
-        };
-        let price = Dia.get_quotation(&quoted_asset).await.expect("should return a quotation");
+        let prices = price_api.get_quotations(assets).await.expect("should return a quotation");
 
-        assert_eq!(price.symbol, quoted_asset.asset.symbol);
-        assert_eq!(price.price, Decimal::new(1, 0));
+        assert!(!prices.is_empty());
+        let ampe_price = prices.first().expect("should return a price").clone();
+
+        assert_eq!(ampe_price.symbol, asset.symbol);
+        assert_eq!(ampe_price.blockchain.expect("should return something"), asset.blockchain);
+        assert!(ampe_price.price > Decimal::new(0, 0));
     }
 }

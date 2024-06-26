@@ -2,16 +2,18 @@ use std::error::Error;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use crate::api::coingecko::CoingeckoPriceApi;
-use crate::api::custom::{CUSTOM_ASSETS, CustomPriceApi};
+use crate::api::custom::{CustomPriceApi};
 use crate::api::polygon::PolygonPriceApi;
 use crate::AssetSpecifier;
 use futures::future::join_all;
 use rust_decimal::Decimal;
+use serde::Deserialize;
 
 mod coingecko;
 mod custom;
 mod polygon;
 
+#[derive(Deserialize, Debug, Clone)]
 pub struct Quotation {
     #[serde(rename(deserialize = "Symbol"))]
     pub symbol: String,
@@ -41,22 +43,27 @@ impl PriceApiImpl {
     }
 }
 
+#[async_trait]
 impl PriceApi for PriceApiImpl {
     async fn get_quotations(
         &self,
         assets: Vec<&AssetSpecifier>,
     ) -> Result<Vec<Quotation>, Box<dyn Error + Sync + Send>> {
-        let futures = vec![
-            self.get_fiat_quotations(assets),
-            self.get_crypto_quotations(assets),
-            self.get_custom_quotations(assets),
-        ];
-
-        let results = join_all(futures).await;
-
-        let quotations: Result<Vec<_>, _> = results.into_iter().collect();
-        let quotations = quotations?.into_iter().flatten().collect();
-
+        // let futures = vec![
+        //     self.get_fiat_quotations(assets),
+        //     self.get_crypto_quotations(assets),
+        //     self.get_custom_quotations(assets),
+        // ];
+        //
+        // let results = join_all(futures).await;
+        //
+        // let quotations: Result<Vec<_>, _> = results.into_iter().collect();
+        // let quotations = quotations?.into_iter().flatten().collect();
+        //
+        let mut quotations = Vec::new();
+        quotations.append(&mut self.get_fiat_quotations(assets.clone()).await?);
+        quotations.append(&mut self.get_crypto_quotations(assets.clone()).await?);
+        quotations.append(&mut self.get_custom_quotations(assets.clone()).await?);
         Ok(quotations)
     }
 }
@@ -68,7 +75,7 @@ impl PriceApiImpl {
     ) -> Result<Vec<Quotation>, Box<dyn Error + Sync + Send>> {
         // Filter out fiat assets
         let fiat_assets: Vec<_> = assets
-            .iter()
+            .into_iter()
             .filter(|asset| asset.blockchain.to_uppercase() == "FIAT")
             .collect();
 
@@ -81,7 +88,7 @@ impl PriceApiImpl {
         assets: Vec<&AssetSpecifier>,
     ) -> Result<Vec<Quotation>, Box<dyn Error + Sync + Send>> {
         let crypto_assets = assets
-            .iter()
+            .into_iter()
             .filter(|asset| asset.blockchain.to_uppercase() == "CRYPTO")
             .collect();
 
@@ -93,9 +100,9 @@ impl PriceApiImpl {
         &self,
         assets: Vec<&AssetSpecifier>,
     ) -> Result<Vec<Quotation>, Box<dyn Error + Sync + Send>> {
-        let custom_assets = assets
-            .iter()
-            .filter(|asset| CUSTOM_ASSETS.contains(asset))
+        let custom_assets: Vec<&AssetSpecifier> = assets
+            .into_iter()
+            .filter(|asset| CustomPriceApi::is_supported(asset))
             .collect();
 
         let mut quotations = Vec::new();
