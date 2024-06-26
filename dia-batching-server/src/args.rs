@@ -16,7 +16,7 @@ pub struct SupportedCurrencies(pub Vec<String>);
 #[structopt(name = "dia-batching-server", about = "An server for batching requests to the Dia API")]
 pub struct DiaApiArgs {
 	/// Iteration duration after one batch of requests
-	#[structopt(short, long, default_value = "60")]
+	#[structopt(short, long, default_value = "10")]
 	pub iteration_timeout_in_seconds: u64,
 
 	/// Timeout after one request
