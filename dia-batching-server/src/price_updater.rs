@@ -10,7 +10,7 @@ use std::{error::Error, sync::Arc};
 
 pub async fn run_update_prices_loop<T>(
 	storage: Arc<CoinInfoStorage>,
-	maybe_supported_currencies: Option<HashSet<AssetSpecifier>>,
+	supported_currencies: HashSet<AssetSpecifier>,
 	duration: std::time::Duration,
 	api: T,
 ) -> Result<(), Box<dyn Error + Send + Sync + 'static>>
@@ -24,7 +24,7 @@ where
 
 			let coins = Arc::clone(&coins);
 
-			update_prices(coins, &maybe_supported_currencies, &api).await;
+			update_prices(coins, &supported_currencies, &api).await;
 
 			tokio::time::delay_for(duration.saturating_sub(time_elapsed.elapsed())).await;
 		}
@@ -57,7 +57,7 @@ fn convert_to_coin_info(value: Quotation) -> Result<CoinInfo, Box<dyn Error + Sy
 
 async fn update_prices<T>(
 	coins: Arc<CoinInfoStorage>,
-	maybe_supported_currencies: &Option<HashSet<AssetSpecifier>>,
+	supported_currencies: &HashSet<AssetSpecifier>,
 	api: &T,
 ) where
 	T: DiaApi + Send + Sync + 'static,
@@ -73,10 +73,7 @@ async fn update_prices<T>(
 				symbol: quotable_asset.asset.symbol.clone(),
 			};
 
-			if maybe_supported_currencies
-				.as_ref()
-				.map_or(true, |supported| supported.contains(&asset))
-			{
+			if supported_currencies.contains(&asset) {
 				match api.get_quotation(&quotable_asset).await.and_then(convert_to_coin_info) {
 					Ok(coin_info) => {
 						currencies.push(coin_info);
@@ -89,7 +86,6 @@ async fn update_prices<T>(
 		}
 	}
 
-	if let Some(supported_currencies) = maybe_supported_currencies.as_ref() {
 		for asset in supported_currencies.iter() {
 			// We do support both these 'blockchain' identifiers while DIA doesn't provide data for them
 			if asset.blockchain == "FIAT" || asset.blockchain == "Amplitude" {
@@ -113,7 +109,6 @@ async fn update_prices<T>(
 					},
 				}
 			}
-		}
 	}
 
 	coins.replace_currencies_by_symbols(currencies);
@@ -314,7 +309,7 @@ mod tests {
 		let mock_api = MockDia::new();
 		let storage = Arc::new(CoinInfoStorage::default());
 		let coins = Arc::clone(&storage);
-		let all_currencies = None;
+		let all_currencies = HashSet::default();
 		update_prices(coins, &all_currencies, &mock_api).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![
@@ -343,7 +338,6 @@ mod tests {
 			.insert(AssetSpecifier { blockchain: "Bitcoin".into(), symbol: "BTC".into() });
 		all_currencies
 			.insert(AssetSpecifier { blockchain: "FIAT".into(), symbol: "MXN-USD".into() });
-		let all_currencies = Some(all_currencies);
 
 		update_prices(coins, &all_currencies, &mock_api).await;
 
@@ -368,7 +362,6 @@ mod tests {
 		let mut all_currencies = HashSet::new();
 		all_currencies
 			.insert(AssetSpecifier { blockchain: "FIAT".into(), symbol: "USD-USD".into() });
-		let all_currencies = Some(all_currencies);
 
 		update_prices(coins, &all_currencies, &mock_api).await;
 
@@ -389,7 +382,7 @@ mod tests {
 		let mock_api = MockDia::new();
 		let storage = Arc::new(CoinInfoStorage::default());
 		let coins = Arc::clone(&storage);
-		let all_currencies = None;
+		let all_currencies = HashSet::default();
 		update_prices(coins, &all_currencies, &mock_api).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![
@@ -405,7 +398,7 @@ mod tests {
 		let mock_api = MockDia::new();
 		let storage = Arc::new(CoinInfoStorage::default());
 		let coins = Arc::clone(&storage);
-		let all_currencies = None;
+		let all_currencies = HashSet::default();
 		update_prices(coins, &all_currencies, &mock_api).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![
@@ -425,7 +418,7 @@ mod tests {
 		let mock_api = MockDia::new();
 		let storage = Arc::new(CoinInfoStorage::default());
 		let coins = Arc::clone(&storage);
-		let all_currencies = None;
+		let all_currencies = HashSet::default();
 		update_prices(coins, &all_currencies, &mock_api).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![]);
@@ -438,7 +431,7 @@ mod tests {
 		let mock_api = MockDia::new();
 		let storage = Arc::new(CoinInfoStorage::default());
 		let coins = Arc::clone(&storage);
-		let all_currencies = None;
+		let all_currencies = HashSet::default();
 
 		update_prices(coins, &all_currencies, &mock_api).await;
 
@@ -455,7 +448,7 @@ mod tests {
 		let mock_api = MockDia::new();
 		let storage = Arc::new(CoinInfoStorage::default());
 		let coins = Arc::clone(&storage);
-		let all_currencies = None;
+		let all_currencies = HashSet::default();
 
 		update_prices(coins, &all_currencies, &mock_api).await;
 
