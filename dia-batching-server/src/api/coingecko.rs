@@ -108,7 +108,7 @@ pub struct SimplePing {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Price {
+pub struct CoingeckoPrice {
     pub usd: Option<f64>,
     pub usd_market_cap: Option<f64>,
     pub usd_24h_vol: Option<f64>,
@@ -178,7 +178,7 @@ impl CoingeckoClient {
         include_24hr_vol: bool,
         include_24hr_change: bool,
         include_last_updated_at: bool,
-    ) -> Result<HashMap<String, Price>, CoingeckoError> {
+    ) -> Result<HashMap<String, CoingeckoPrice>, CoingeckoError> {
         let ids = ids.iter().map(AsRef::as_ref).collect::<Vec<_>>();
         // We always query for USD
         let vs_currencies = vec!["usd"];

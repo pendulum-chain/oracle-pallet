@@ -1,8 +1,8 @@
-use std::collections::HashMap;
 use std::error::Error;
 use clap::Parser;
+use rust_decimal::Decimal;
 use serde::de::DeserializeOwned;
-use crate::api::coingecko::{Price, SimplePing};
+use serde::{Deserialize, Serialize};
 use crate::api::error::{CoingeckoError, PolygonError};
 use crate::api::Quotation;
 use crate::AssetSpecifier;
@@ -26,6 +26,19 @@ impl PolygonPriceApi {
     pub async fn get_prices(assets: Vec<&AssetSpecifier>) -> Result<Vec<Quotation>, Box<dyn Error + Send + Sync>> {
         Err("Unsupported asset".into())
     }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct PolygonPrice {
+    pub converted: Decimal,
+    pub from: String,
+    #[serde(rename = "initialAmount")]
+    pub initial_amount: i64,
+    pub last: serde_json::Value,
+    pub request_id: String,
+    pub status: String,
+    pub symbol: String,
+    pub to: String,
 }
 
 /// Polygon network client
@@ -59,12 +72,11 @@ impl PolygonClient {
         match response {
             Ok(response) => {
                 if !response.status().is_success() {
-                    // return Err(reqwest::Error::from_str("Request failed"));
                     let result = response.text().await;
                     Err(PolygonError(result.unwrap()))
                 } else {
                     let result = response.json().await;
-                    result.map_err(|e| PolygonError(e.to_string()))
+                    result.map_err(|e| PolygonError("Could not decode Polygon response: ".to_owned() + &e.to_string()))
                 }
             }
             Err(e) => {
@@ -77,7 +89,7 @@ impl PolygonClient {
     pub async fn price(
         &self,
         from_currency: &str,
-    ) -> Result<HashMap<String, Price>, PolygonError> {
+    ) -> Result<PolygonPrice, PolygonError> {
         // Currencies have to be upper-case
         let from_currency = from_currency.to_uppercase();
         // We always query for USD.
@@ -118,11 +130,15 @@ mod tests {
         PolygonClient::new(host_url, api_key)
     }
     #[tokio::test]
-    async fn test_polygon_client() {
+    async fn test_fetching_price() {
         let client = create_client();
 
         let result = client.price(&"brl").await;
 
         assert!(result.is_ok());
+        let brl_price = result.unwrap();
+        assert_eq!(brl_price.from, "BRL");
+        assert_eq!(brl_price.to, "USD");
+        assert!(brl_price.converted > 0.into());
     }
 }
