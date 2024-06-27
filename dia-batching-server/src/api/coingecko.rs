@@ -116,7 +116,7 @@ pub struct Price {
     pub last_updated_at: Option<u64>,
 }
 
-/// CoinGecko client
+/// CoinGecko network client
 pub struct CoingeckoClient {
     host: String,
     api_key: String,
