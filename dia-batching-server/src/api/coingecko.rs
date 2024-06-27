@@ -54,25 +54,22 @@ impl CoingeckoPriceApi {
             }
         }).collect::<Vec<_>>();
 
-        let prices = self.client.price(&coingecko_ids, false, false, false, true).await.map_err(
+        let id_to_price_map = self.client.price(&coingecko_ids, false, false, false, true).await.map_err(
             |e| CoingeckoError(e.to_string())
         )?;
 
-        let quotations = prices.into_iter().filter_map(|(id, price)| {
+        let quotations = id_to_price_map.into_iter().filter_map(|(id, price)| {
             let asset = assets.iter().find(|asset| {
                 Self::convert_to_coingecko_id(asset).as_deref() == Some(id.as_str())
             })?;
-            let price_usd = price.usd.unwrap_or_default();
-            match Decimal::from_f64(price_usd) {
-                Some(price_decimal) => Some(Quotation {
-                    symbol: asset.symbol.clone(),
-                    name: asset.symbol.clone(),
-                    blockchain: Some(asset.blockchain.clone()),
-                    price: price_decimal,
-                    time: chrono::Utc::now(),
-                }),
-                None => None
-            }
+
+            Some(Quotation {
+                symbol: asset.symbol.clone(),
+                name: asset.symbol.clone(),
+                blockchain: Some(asset.blockchain.clone()),
+                price: price.usd,
+                time: chrono::Utc::now(),
+            })
         }).collect();
 
         Ok(quotations)
@@ -109,11 +106,11 @@ pub struct SimplePing {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CoingeckoPrice {
-    pub usd: Option<f64>,
+    pub usd: Decimal,
     pub usd_market_cap: Option<f64>,
     pub usd_24h_vol: Option<f64>,
     pub usd_24h_change: Option<f64>,
-    pub last_updated_at: Option<u64>,
+    pub last_updated_at: u64,
 }
 
 /// CoinGecko network client
@@ -234,12 +231,11 @@ mod tests {
         assert_eq!(prices.len(), ids.len());
 
         let stellar_price = prices.get("stellar").expect("Should return a price");
-        assert!(stellar_price.usd.is_some());
-        assert!(stellar_price.usd.unwrap() > 0.0);
+        assert!(stellar_price.usd > 0.into());
         assert!(stellar_price.usd_market_cap.is_some());
         assert!(stellar_price.usd_24h_vol.is_some());
         assert!(stellar_price.usd_24h_change.is_some());
-        assert!(stellar_price.last_updated_at.is_some());
+        assert!(stellar_price.last_updated_at > 0);
     }
 
     #[tokio::test]
@@ -252,20 +248,18 @@ mod tests {
         assert_eq!(prices.len(), ids.len());
 
         let stellar_price = prices.get("stellar").expect("Should return a price");
-        assert!(stellar_price.usd.is_some());
-        assert!(stellar_price.usd.unwrap() > 0.0);
+        assert!(stellar_price.usd > 0.into());
         assert!(stellar_price.usd_market_cap.is_some());
         assert!(stellar_price.usd_24h_vol.is_some());
         assert!(stellar_price.usd_24h_change.is_some());
-        assert!(stellar_price.last_updated_at.is_some());
+        assert!(stellar_price.last_updated_at > 0);
 
         let vdot_price = prices.get("voucher-dot").expect("Should return a price");
-        assert!(vdot_price.usd.is_some());
-        assert!(vdot_price.usd.unwrap() > 0.0);
+        assert!(vdot_price.usd > 0.into());
         assert!(vdot_price.usd_market_cap.is_some());
         assert!(vdot_price.usd_24h_vol.is_some());
         assert!(vdot_price.usd_24h_change.is_some());
-        assert!(vdot_price.last_updated_at.is_some());
+        assert!(vdot_price.last_updated_at > 0);
     }
 
     #[tokio::test]
@@ -294,12 +288,12 @@ mod tests {
         assert_eq!(stellar_quotation.symbol, stellar_asset.symbol);
         assert_eq!(stellar_quotation.name, stellar_asset.symbol);
         assert_eq!(stellar_quotation.blockchain, Some(stellar_asset.blockchain));
-        assert!(stellar_quotation.price > Decimal::from_f64(0.0).unwrap());
+        assert!(stellar_quotation.price > 0.into());
 
         let vdot_quotation = quotations.iter().find(|q| q.symbol == voucher_dot_asset.symbol).expect("Should return a vDOT quotation");
         assert_eq!(vdot_quotation.symbol, voucher_dot_asset.symbol);
         assert_eq!(vdot_quotation.name, voucher_dot_asset.symbol);
         assert_eq!(vdot_quotation.blockchain, Some(voucher_dot_asset.blockchain));
-        assert!(vdot_quotation.price > Decimal::from_f64(0.0).unwrap());
+        assert!(vdot_quotation.price > 0.into());
     }
 }

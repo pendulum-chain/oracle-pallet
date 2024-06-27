@@ -37,9 +37,9 @@ impl PolygonPriceApi {
         }
     }
     pub async fn get_prices(&self, assets: Vec<&AssetSpecifier>) -> Result<Vec<Quotation>, PolygonError> {
-        let polygon_ids = assets.into_iter().filter_map(|asset| {
-            let polygon_id = PolygonPriceApi::convert_to_polygon_id(asset);
-            match polygon_id {
+        let asset_and_source_currency = assets.into_iter().filter_map(|asset| {
+            let source_curreny = PolygonPriceApi::extract_source_currency(asset);
+            match source_curreny {
                 Some(polygon_id) => Some((asset, polygon_id)),
                 None => {
                     log::warn!("Unsupported polygon asset: {:?}", asset);
@@ -50,9 +50,9 @@ impl PolygonPriceApi {
 
 
         let mut prices = Vec::new();
-        for (asset, polygon_id) in polygon_ids {
+        for (asset, source_currency) in asset_and_source_currency {
             // We always return 1 USD as 1 USD
-            if polygon_id == "USD" {
+            if source_currency == "USD" {
                 let quotation = Quotation {
                     symbol: "USD-USD".to_string(),
                     name: "USD-USD".to_string(),
@@ -65,7 +65,7 @@ impl PolygonPriceApi {
             }
 
 
-            let price = self.client.price(polygon_id).await.map_err(
+            let price = self.client.price(source_currency).await.map_err(
                 |e| PolygonError(e.to_string())
             )?;
 
@@ -84,13 +84,12 @@ impl PolygonPriceApi {
     }
 
     pub fn is_supported(asset: &AssetSpecifier) -> bool {
-        Self::convert_to_polygon_id(asset).is_some()
+        Self::extract_source_currency(asset).is_some()
     }
 
-    /// Maps the blockchain and symbol pair to the CoinGecko ID.
-    /// For now, this conversion is using a hard-coded list.
-    /// We need to change our on-chain data to use CoinGecko IDs in the future.
-    fn convert_to_polygon_id(asset: &AssetSpecifier) -> Option<String> {
+    /// Extract the source currency from the asset pair.
+    /// We assume that the symbol contained in the `AssetSpecifier` is of the form <from>-<to>.
+    fn extract_source_currency(asset: &AssetSpecifier) -> Option<String> {
         let (blockchain, symbol) = (asset.blockchain.as_str(), asset.symbol.as_str());
         if blockchain.to_uppercase() != "FIAT" {
             return None;
