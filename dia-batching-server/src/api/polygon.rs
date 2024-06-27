@@ -23,8 +23,71 @@ pub struct PolygonPriceApi {
 }
 
 impl PolygonPriceApi {
-    pub async fn get_prices(assets: Vec<&AssetSpecifier>) -> Result<Vec<Quotation>, Box<dyn Error + Send + Sync>> {
-        Err("Unsupported asset".into())
+    pub fn new_from_config(config: PolygonConfig) -> Self {
+        let api_key = config.pg_api_key.expect("Please provide a CoinGecko API key");
+
+        Self::new(config.pg_host_url, api_key)
+    }
+
+    pub fn new(host_url: String, api_key: String) -> Self {
+        let client = PolygonClient::new(host_url, api_key);
+
+        Self {
+            client,
+        }
+    }
+    pub async fn get_prices(&self, assets: Vec<&AssetSpecifier>) -> Result<Vec<Quotation>, PolygonError> {
+        let polygon_ids = assets.into_iter().filter_map(|asset| {
+            let polygon_id = PolygonPriceApi::convert_to_polygon_id(asset);
+            match polygon_id {
+                Some(polygon_id) => Some((asset, polygon_id)),
+                None => {
+                    log::warn!("Unsupported asset: {:?}", asset);
+                    None
+                }
+            }
+        }).collect::<Vec<_>>();
+
+
+        let mut prices = Vec::new();
+        for (asset, polygon_id) in polygon_ids {
+            let price = self.client.price(polygon_id.as_str()).await.map_err(
+                |e| PolygonError(e.to_string())
+            )?;
+            let symbol = asset.symbol.clone();
+            let quotation = Quotation {
+                symbol: symbol.clone(),
+                name: symbol,
+                blockchain: Some("FIAT".to_string()),
+                price: price.converted,
+                time: chrono::Utc::now(),
+            };
+            prices.push(quotation);
+        }
+
+        Ok(prices)
+    }
+
+    pub fn is_supported(asset: &AssetSpecifier) -> bool {
+        Self::convert_to_polygon_id(asset).is_some()
+    }
+
+    /// Maps the blockchain and symbol pair to the CoinGecko ID.
+    /// For now, this conversion is using a hard-coded list.
+    /// We need to change our on-chain data to use CoinGecko IDs in the future.
+    fn convert_to_polygon_id(asset: &AssetSpecifier) -> Option<String> {
+        let (blockchain, symbol) = (asset.blockchain.as_str(), asset.symbol.as_str());
+        if blockchain.to_uppercase() != "FIAT" {
+            return None;
+        }
+
+        // We assume to receive a symbol of form <from>-<to> and we want to extract the <from> part
+        let parts: Vec<_> = symbol.split('-').collect();
+        if parts.len() != 2 {
+            return None;
+        }
+        let from_currency = parts.get(0)?;
+        Some(from_currency.to_uppercase())
     }
 }
 
@@ -108,7 +171,8 @@ impl PolygonClient {
 mod tests {
     use std::env;
     use crate::api::coingecko::CoingeckoClient;
-    use crate::api::polygon::PolygonClient;
+    use crate::api::polygon::{PolygonClient, PolygonPriceApi};
+    use crate::AssetSpecifier;
 
     fn read_env_variable(key: &str) -> Option<String> {
         if let None = dotenv::from_filename("../.env").ok() {
@@ -129,6 +193,7 @@ mod tests {
         let (api_key, host_url) = get_polygon_variables();
         PolygonClient::new(host_url, api_key)
     }
+
     #[tokio::test]
     async fn test_fetching_price() {
         let client = create_client();
@@ -140,5 +205,56 @@ mod tests {
         assert_eq!(brl_price.from, "BRL");
         assert_eq!(brl_price.to, "USD");
         assert!(brl_price.converted > 0.into());
+    }
+
+    #[tokio::test]
+    async fn test_api_returns_prices() {
+        let (api_key, host_url) = get_polygon_variables();
+
+        let polygon_api = PolygonPriceApi::new(host_url, api_key);
+        let brl_asset = AssetSpecifier {
+            blockchain: "FIAT".to_string(),
+            symbol: "BRL-USD".to_string(),
+        };
+        let eur_asset = AssetSpecifier {
+            blockchain: "FIAT".to_string(),
+            symbol: "EUR-USD".to_string(),
+        };
+        let assets = vec![&brl_asset, &eur_asset];
+
+        let result = polygon_api.get_prices(assets.clone()).await;
+        assert!(result.is_ok());
+
+        let prices = result.unwrap();
+        assert_eq!(prices.len(), assets.len());
+
+        let brl_price = prices.first().unwrap();
+        assert_eq!(brl_price.symbol, brl_asset.symbol);
+        assert_eq!(brl_price.name, brl_asset.symbol);
+        assert_eq!(brl_price.blockchain, Some("FIAT".to_string()));
+        assert!(brl_price.price > 0.into());
+
+        let eur_price = prices.last().unwrap();
+        assert_eq!(eur_price.symbol, eur_asset.symbol);
+        assert_eq!(eur_price.name, eur_asset.symbol);
+        assert_eq!(eur_price.blockchain, Some("FIAT".to_string()));
+        assert!(eur_price.price > 0.into());
+    }
+
+    #[tokio::test]
+    async fn test_api_returns_price_for_usd() {
+        let (api_key, host_url) = get_polygon_variables();
+
+        let polygon_api = PolygonPriceApi::new(host_url, api_key);
+        let usd_asset = AssetSpecifier {
+            blockchain: "FIAT".to_string(),
+            symbol: "USD-USD".to_string(),
+        };
+        let assets = vec![&usd_asset];
+
+        let result = polygon_api.get_prices(assets.clone()).await;
+        assert!(result.is_ok());
+        let prices = result.unwrap();
+        assert_eq!(prices.len(), assets.len());
     }
 }

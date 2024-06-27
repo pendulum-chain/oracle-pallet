@@ -4,12 +4,12 @@ use chrono::{DateTime, Utc};
 use clap::Parser;
 use crate::api::coingecko::{CoingeckoConfig, CoingeckoPriceApi};
 use crate::api::custom::{CustomPriceApi};
-use crate::api::polygon::PolygonPriceApi;
+use crate::api::polygon::{PolygonConfig, PolygonPriceApi};
 use crate::AssetSpecifier;
 use futures::future::join_all;
 use rust_decimal::Decimal;
 use serde::Deserialize;
-use crate::api::error::ApiError;
+use crate::api::error::{ApiError, PolygonError};
 
 mod coingecko;
 mod custom;
@@ -40,12 +40,14 @@ pub trait PriceApi {
 
 pub struct PriceApiImpl {
     coingecko_price_api: CoingeckoPriceApi,
+    polygon_price_api: PolygonPriceApi,
 }
 
 impl PriceApiImpl {
     pub fn new() -> Self {
         Self {
-            coingecko_price_api: CoingeckoPriceApi::new_from_config(CoingeckoConfig::parse())
+            coingecko_price_api: CoingeckoPriceApi::new_from_config(CoingeckoConfig::parse()),
+            polygon_price_api: PolygonPriceApi::new_from_config(PolygonConfig::parse()),
         }
     }
 }
@@ -61,7 +63,7 @@ impl PriceApi for PriceApiImpl {
         // First, get fiat quotations
         let fiat_assets: Vec<_> = assets.clone()
             .into_iter()
-            .filter(|asset| asset.blockchain.to_uppercase() == "FIAT")
+            .filter(|asset| PolygonPriceApi::is_supported(asset))
             .collect();
 
         let fiat_quotes = self.get_fiat_quotations(fiat_assets.clone()).await;
@@ -98,8 +100,8 @@ impl PriceApiImpl {
     async fn get_fiat_quotations(
         &self,
         assets: Vec<&AssetSpecifier>,
-    ) -> Result<Vec<Quotation>, Box<dyn Error + Sync + Send>> {
-        let quotations = PolygonPriceApi::get_prices(assets).await?;
+    ) -> Result<Vec<Quotation>, PolygonError> {
+        let quotations = self.polygon_price_api.get_prices(assets).await?;
         Ok(quotations)
     }
 
