@@ -44,7 +44,7 @@ impl CoingeckoPriceApi {
 
     pub async fn get_prices(&self, assets: Vec<&AssetSpecifier>) -> Result<Vec<Quotation>, CoingeckoError> {
         let coingecko_ids = assets.clone().into_iter().filter_map(|asset| {
-            let id = self.convert_to_coingecko_id(asset);
+            let id = Self::convert_to_coingecko_id(asset);
             match id {
                 Some(id) => Some(id),
                 None => {
@@ -60,27 +60,32 @@ impl CoingeckoPriceApi {
 
         let quotations = prices.into_iter().filter_map(|(id, price)| {
             let asset = assets.iter().find(|asset| {
-                self.convert_to_coingecko_id(asset).as_deref() == Some(id.as_str())
+                Self::convert_to_coingecko_id(asset).as_deref() == Some(id.as_str())
             })?;
             let price_usd = price.usd.unwrap_or_default();
-            let price_decimal = Decimal::from_f64(price_usd).expect("Could not convert price to Decimal");
-
-            Some(Quotation {
-                symbol: asset.symbol.clone(),
-                name: asset.symbol.clone(),
-                blockchain: Some(asset.blockchain.clone()),
-                price: price_decimal,
-                time: chrono::Utc::now(),
-            })
+            match Decimal::from_f64(price_usd) {
+                Some(price_decimal) => Some(Quotation {
+                    symbol: asset.symbol.clone(),
+                    name: asset.symbol.clone(),
+                    blockchain: Some(asset.blockchain.clone()),
+                    price: price_decimal,
+                    time: chrono::Utc::now(),
+                }),
+                None => None
+            }
         }).collect();
 
         Ok(quotations)
     }
 
+    pub fn is_supported(asset: &AssetSpecifier) -> bool {
+        Self::convert_to_coingecko_id(asset).is_some()
+    }
+
     /// Maps the blockchain and symbol pair to the CoinGecko ID.
     /// For now, this conversion is using a hard-coded list.
     /// We need to change our on-chain data to use CoinGecko IDs in the future.
-    fn convert_to_coingecko_id(&self, asset: &AssetSpecifier) -> Option<String> {
+    fn convert_to_coingecko_id(asset: &AssetSpecifier) -> Option<String> {
         match (asset.blockchain.as_str(), asset.symbol.as_str()) {
             ("Pendulum", "PEN") => Some("pendulum".to_string()),
             ("Polkadot", "DOT") => Some("polkadot".to_string()),
@@ -102,9 +107,6 @@ pub struct SimplePing {
     pub gecko_says: String,
 }
 
-// ---------------------------------------------
-//  /simple/price and /simple/token_price/{id}
-// ---------------------------------------------
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Price {
     pub usd: Option<f64>,
@@ -168,19 +170,7 @@ impl CoingeckoClient {
         self.get("/ping").await
     }
 
-    /// Get the current price of any cryptocurrencies in any other supported currencies that you need
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// #[tokio::main]
-    /// async fn main() {
-    ///     use coingecko::CoinGeckoClient;
-    ///     let client = CoinGeckoClient::default();
-    ///
-    ///     client.price(&["bitcoin", "ethereum"], &["usd"], true, true, true, true).await;
-    /// }
-    /// ```
+    /// Get the current price of any cryptocurrencies vs USD with full precision
     pub async fn price<Id: AsRef<str>>(
         &self,
         ids: &[Id],
@@ -311,9 +301,5 @@ mod tests {
         assert_eq!(vdot_quotation.name, voucher_dot_asset.symbol);
         assert_eq!(vdot_quotation.blockchain, Some(voucher_dot_asset.blockchain));
         assert!(vdot_quotation.price > Decimal::from_f64(0.0).unwrap());
-
-        let res = stellar_quotation.price.to_string();
-        let res2 = vdot_quotation.price.to_string();
-        assert_eq!(res, "0.0");
     }
 }

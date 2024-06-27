@@ -80,10 +80,10 @@ impl PriceApi for PriceApiImpl {
             quotations.extend(custom_quotes);
         }
 
-        // Finally, get crypto quotations, assuming that all other assets are crypto
+        // Finally, get supported crypto quotations
         let crypto_assets = assets.into_iter().filter(|asset| {
-            !fiat_assets.contains(&asset) && !custom_assets.contains(&asset)
-        }).collect::<Vec<_>>(
+            CoingeckoPriceApi::is_supported(asset)
+        }).collect::<Vec<_>>();
 
         let crypto_quotes = self.get_crypto_quotations(crypto_assets).await;
         if let Ok(crypto_quotes) = crypto_quotes {
