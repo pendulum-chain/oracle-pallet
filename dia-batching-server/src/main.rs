@@ -9,6 +9,7 @@ use log::error;
 use std::sync::Arc;
 use structopt::StructOpt;
 use crate::api::PriceApiImpl;
+use serde::{Deserialize, Serialize};
 
 mod api;
 mod args;
@@ -17,7 +18,7 @@ mod price_updater;
 mod storage;
 
 /// This struct is used to identify a specific asset.
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
 pub struct AssetSpecifier {
     blockchain: String,
     symbol: String,

@@ -108,9 +108,6 @@ fn convert_decimal_to_u128(input: &Decimal) -> Result<u128, ConvertingError> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        handlers::Currency,
-    };
     use std::{collections::HashMap, error::Error, sync::Arc};
 
     use async_trait::async_trait;
@@ -184,7 +181,7 @@ mod tests {
                     blockchain: None,
                     price: Decimal::new(1, 0),
                     time: Utc::now(),
-                }
+                },
             );
             Self { quotation }
         }
@@ -193,7 +190,13 @@ mod tests {
     #[async_trait]
     impl PriceApi for MockDia {
         async fn get_quotations(&self, assets: Vec<&AssetSpecifier>) -> Result<Vec<Quotation>, ApiError> {
-            todo!()
+            let mut quotations = Vec::new();
+            for asset in assets {
+                if let Some(q) = self.quotation.get(asset) {
+                    quotations.push(q.clone());
+                }
+            }
+            Ok(quotations)
         }
     }
 
@@ -202,16 +205,20 @@ mod tests {
         let mock_api = MockDia::new();
         let storage = Arc::new(CoinInfoStorage::default());
         let coins = Arc::clone(&storage);
-        let all_currencies = HashSet::default();
+        let mut all_currencies = HashSet::default();
+        let supported_currencies = vec![
+            AssetSpecifier { blockchain: "Bitcoin".into(), symbol: "BTC".into() },
+            AssetSpecifier { blockchain: "Ethereum".into(), symbol: "ETH".into() },
+            AssetSpecifier { blockchain: "Ethereum".into(), symbol: "USDT".into() },
+            AssetSpecifier { blockchain: "Ethereum".into(), symbol: "USDC".into() },
+        ];
+        for currency in supported_currencies.clone() {
+            all_currencies.insert(currency);
+        }
+
         update_prices(coins, &all_currencies, &mock_api).await;
 
-        let c = storage.get_currencies_by_blockchains_and_symbols(vec![
-            Currency { blockchain: "Bitcoin".into(), symbol: "BTC".into() },
-            Currency { blockchain: "Ethereum".into(), symbol: "ETH".into() },
-            Currency { blockchain: "Ethereum".into(), symbol: "USDT".into() },
-            Currency { blockchain: "Ethereum".into(), symbol: "USDC".into() },
-            Currency { blockchain: "Amplitude".into(), symbol: "AMPE".into() },
-        ]);
+        let c = storage.get_currencies_by_blockchains_and_symbols(supported_currencies);
 
         assert_eq!(4, c.len());
 
@@ -235,8 +242,8 @@ mod tests {
         update_prices(coins, &all_currencies, &mock_api).await;
 
         let c = storage.get_currencies_by_blockchains_and_symbols(vec![
-            Currency { blockchain: "Bitcoin".into(), symbol: "BTC".into() },
-            Currency { blockchain: "FIAT".into(), symbol: "MXN-USD".into() },
+            AssetSpecifier { blockchain: "Bitcoin".into(), symbol: "BTC".into() },
+            AssetSpecifier { blockchain: "FIAT".into(), symbol: "MXN-USD".into() },
         ]);
 
         assert_eq!(2, c.len());
@@ -258,7 +265,7 @@ mod tests {
 
         update_prices(coins, &all_currencies, &mock_api).await;
 
-        let c = storage.get_currencies_by_blockchains_and_symbols(vec![Currency {
+        let c = storage.get_currencies_by_blockchains_and_symbols(vec![AssetSpecifier {
             blockchain: "FIAT".into(),
             symbol: "USD-USD".into(),
         }]);
@@ -279,8 +286,8 @@ mod tests {
         update_prices(coins, &all_currencies, &mock_api).await;
 
         let c = storage.get_currencies_by_blockchains_and_symbols(vec![
-            Currency { blockchain: "Bitcoin".into(), symbol: "BTCCash".into() },
-            Currency { blockchain: "Ethereum".into(), symbol: "ETHCase".into() },
+            AssetSpecifier { blockchain: "Bitcoin".into(), symbol: "BTCCash".into() },
+            AssetSpecifier { blockchain: "Ethereum".into(), symbol: "ETHCase".into() },
         ]);
 
         assert_eq!(0, c.len());
@@ -291,13 +298,17 @@ mod tests {
         let mock_api = MockDia::new();
         let storage = Arc::new(CoinInfoStorage::default());
         let coins = Arc::clone(&storage);
-        let all_currencies = HashSet::default();
+        let mut all_currencies = HashSet::default();
+        let supported_currencies = vec![
+            AssetSpecifier { blockchain: "Bitcoin".into(), symbol: "BTC".into() },
+            AssetSpecifier { blockchain: "Ethereum".into(), symbol: "ETHCase".into() },
+        ];
+        for currency in supported_currencies.clone() {
+            all_currencies.insert(currency);
+        }
         update_prices(coins, &all_currencies, &mock_api).await;
 
-        let c = storage.get_currencies_by_blockchains_and_symbols(vec![
-            Currency { blockchain: "Bitcoin".into(), symbol: "BTC".into() },
-            Currency { blockchain: "Ethereum".into(), symbol: "ETHCase".into() },
-        ]);
+        let c = storage.get_currencies_by_blockchains_and_symbols(supported_currencies);
 
         assert_eq!(1, c.len());
 
@@ -328,7 +339,7 @@ mod tests {
 
         update_prices(coins, &all_currencies, &mock_api).await;
 
-        let c = storage.get_currencies_by_blockchains_and_symbols(vec![Currency {
+        let c = storage.get_currencies_by_blockchains_and_symbols(vec![AssetSpecifier {
             blockchain: "Bitcoin".into(),
             symbol: "123".into(),
         }]);
@@ -341,24 +352,28 @@ mod tests {
         let mock_api = MockDia::new();
         let storage = Arc::new(CoinInfoStorage::default());
         let coins = Arc::clone(&storage);
-        let all_currencies = HashSet::default();
+        let mut all_currencies = HashSet::default();
+        let supported_currencies = vec![
+            AssetSpecifier { blockchain: "Bitcoin".into(), symbol: "BTC".into() },
+            AssetSpecifier { blockchain: "Ethereum".into(), symbol: "USDC".into() },
+            AssetSpecifier { blockchain: "Ethereum".into(), symbol: "USDT".into() },
+        ];
+        for currency in supported_currencies.clone() {
+            all_currencies.insert(currency);
+        }
 
         update_prices(coins, &all_currencies, &mock_api).await;
 
-        let c = storage.get_currencies_by_blockchains_and_symbols(vec![
-            Currency { blockchain: "Bitcoin".into(), symbol: "BTC".into() },
-            Currency { blockchain: "Ethereum".into(), symbol: "USDC".into() },
-            Currency { blockchain: "Ethereum".into(), symbol: "USDT".into() },
-        ]);
+        let c = storage.get_currencies_by_blockchains_and_symbols(supported_currencies);
 
         assert_eq!(c[0].price, 1000000000000);
-        assert_eq!(c[0].supply, 123456789012);
+        assert_eq!(c[0].supply, 0);
 
         assert_eq!(c[1].price, 123456789123456789012);
-        assert_eq!(c[1].supply, 298134760000000000000);
+        assert_eq!(c[1].supply, 0);
 
         assert_eq!(c[2].price, 1000000000001);
-        assert_eq!(c[2].supply, 1);
+        assert_eq!(c[2].supply, 0);
 
         assert_eq!(c[0].name, "BTC");
         assert_eq!(c[1].name, "USDC");

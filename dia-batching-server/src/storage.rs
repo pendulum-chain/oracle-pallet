@@ -3,8 +3,7 @@ use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 use std::collections::HashMap;
 use std::sync::Arc;
-
-use crate::handlers::Currency;
+use crate::AssetSpecifier;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -25,12 +24,12 @@ pub struct CoinInfoStorage {
 impl CoinInfoStorage {
 	pub fn get_currencies_by_blockchains_and_symbols(
 		&self,
-		blockchain_and_symbols: Vec<Currency>,
+		blockchain_and_symbols: Vec<AssetSpecifier>,
 	) -> Vec<CoinInfo> {
 		let reference = self.currencies_by_blockchain_and_symbol.load();
 		blockchain_and_symbols
 			.iter()
-			.filter_map(|Currency { blockchain, symbol }| {
+			.filter_map(|AssetSpecifier { blockchain, symbol }| {
 				reference.get(&(blockchain.into(), symbol.into()))
 			})
 			.cloned()
