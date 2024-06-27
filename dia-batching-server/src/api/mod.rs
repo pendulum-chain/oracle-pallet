@@ -56,33 +56,40 @@ impl PriceApi for PriceApiImpl {
         &self,
         assets: Vec<&AssetSpecifier>,
     ) -> Result<Vec<Quotation>, Box<dyn Error + Sync + Send>> {
-        // let futures = vec![
-        //     self.get_fiat_quotations(assets),
-        //     self.get_crypto_quotations(assets),
-        //     self.get_custom_quotations(assets),
-        // ];
-        //
-        // let results = join_all(futures).await;
-        //
-        // let quotations: Result<Vec<_>, _> = results.into_iter().collect();
-        // let quotations = quotations?.into_iter().flatten().collect();
-        //
         let mut quotations = Vec::new();
 
-        let fiat_quotes = self.get_fiat_quotations(assets.clone()).await;
+        // First, get fiat quotations
+        let fiat_assets: Vec<_> = assets.clone()
+            .into_iter()
+            .filter(|asset| asset.blockchain.to_uppercase() == "FIAT")
+            .collect();
+
+        let fiat_quotes = self.get_fiat_quotations(fiat_assets.clone()).await;
         if let Ok(fiat_quotes) = fiat_quotes {
             quotations.extend(fiat_quotes);
         }
 
-        let crypto_quotes = self.get_crypto_quotations(assets.clone()).await;
+        // Then, get quotations for custom assets
+        let custom_assets: Vec<&AssetSpecifier> = assets.clone()
+            .into_iter()
+            .filter(|asset| CustomPriceApi::is_supported(asset))
+            .collect();
+
+        let custom_quotes = self.get_custom_quotations(custom_assets.clone()).await;
+        if let Ok(custom_quotes) = custom_quotes {
+            quotations.extend(custom_quotes);
+        }
+
+        // Finally, get crypto quotations, assuming that all other assets are crypto
+        let crypto_assets = assets.into_iter().filter(|asset| {
+            !fiat_assets.contains(&asset) && !custom_assets.contains(&asset)
+        }).collect::<Vec<_>>(
+
+        let crypto_quotes = self.get_crypto_quotations(crypto_assets).await;
         if let Ok(crypto_quotes) = crypto_quotes {
             quotations.extend(crypto_quotes);
         }
 
-        let custom_quotes = self.get_custom_quotations(assets.clone()).await;
-        if let Ok(custom_quotes) = custom_quotes {
-            quotations.extend(custom_quotes);
-        }
         Ok(quotations)
     }
 }
@@ -92,13 +99,7 @@ impl PriceApiImpl {
         &self,
         assets: Vec<&AssetSpecifier>,
     ) -> Result<Vec<Quotation>, Box<dyn Error + Sync + Send>> {
-        // Filter out fiat assets
-        let fiat_assets: Vec<_> = assets
-            .into_iter()
-            .filter(|asset| asset.blockchain.to_uppercase() == "FIAT")
-            .collect();
-
-        let quotations = PolygonPriceApi::get_prices(fiat_assets).await?;
+        let quotations = PolygonPriceApi::get_prices(assets).await?;
         Ok(quotations)
     }
 
@@ -106,12 +107,7 @@ impl PriceApiImpl {
         &self,
         assets: Vec<&AssetSpecifier>,
     ) -> Result<Vec<Quotation>, ApiError> {
-        let crypto_assets = assets
-            .into_iter()
-            .filter(|asset| asset.blockchain.to_uppercase() == "CRYPTO")
-            .collect();
-
-        let quotations = self.coingecko_price_api.get_prices(crypto_assets).await.map_err(
+        let quotations = self.coingecko_price_api.get_prices(assets).await.map_err(
             |e| {
                 ApiError::CoingeckoError(e)
             },
@@ -123,13 +119,8 @@ impl PriceApiImpl {
         &self,
         assets: Vec<&AssetSpecifier>,
     ) -> Result<Vec<Quotation>, Box<dyn Error + Sync + Send>> {
-        let custom_assets: Vec<&AssetSpecifier> = assets
-            .into_iter()
-            .filter(|asset| CustomPriceApi::is_supported(asset))
-            .collect();
-
         let mut quotations = Vec::new();
-        for asset in custom_assets {
+        for asset in assets {
             let quotation = CustomPriceApi::get_price(asset).await?;
             quotations.push(quotation);
         }

@@ -9,7 +9,6 @@ actix-web = "4.8.0"
 arc-swap = "1.4.0"
 async-trait = "0.1.51"
 
-coingecko = "1.0.1"
 clap = {  version = "3.2.25", features = ["derive", "env"] }
 dotenv = "0.15.0"
 

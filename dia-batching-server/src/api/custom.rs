@@ -9,7 +9,6 @@ use serde::Deserialize;
 use crate::api::Quotation;
 use crate::AssetSpecifier;
 
-
 pub struct CustomPriceApi;
 
 impl CustomPriceApi {
@@ -23,7 +22,7 @@ impl CustomPriceApi {
 
     pub fn is_supported(asset: &AssetSpecifier) -> bool {
         let custom_assets: Vec<AssetSpecifier> = vec![AssetSpecifier {
-            blockchain: "CRYPTO".to_string(),
+            blockchain: "Amplitude".to_string(),
             symbol: "AMPE".to_string(),
         }];
 
@@ -101,7 +100,7 @@ mod tests {
     #[tokio::test]
     async fn test_ampe_price() {
         let asset = AssetSpecifier {
-            blockchain: "CRYPTO".to_string(),
+            blockchain: "Amplitude".to_string(),
             symbol: "AMPE".to_string(),
         };
         let assets = vec![&asset];

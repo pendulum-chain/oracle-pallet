@@ -8,6 +8,8 @@ use serde::de::DeserializeOwned;
 use crate::api::error::CoingeckoError;
 use crate::api::Quotation;
 use crate::AssetSpecifier;
+use rust_decimal::Decimal;
+use rust_decimal::prelude::FromPrimitive;
 
 #[derive(Parser, Debug, Clone)]
 pub struct CoingeckoConfig {
@@ -15,7 +17,8 @@ pub struct CoingeckoConfig {
     #[clap(long, env = "CG_API_KEY")]
     pub cg_api_key: Option<String>,
 
-    /// Logging output format.
+    /// The host URL for CoinGecko.
+    /// Defaults to the CoinGecko Pro API.
     #[clap(long, env = "CG_HOST_URL", default_value = "https://pro-api.coingecko.com/api/v3")]
     pub cg_host_url: String,
 }
@@ -26,13 +29,9 @@ pub struct CoingeckoPriceApi {
 
 impl CoingeckoPriceApi {
     pub fn new_from_config(config: CoingeckoConfig) -> Self {
-        let config = CoingeckoConfig::parse();
         let api_key = config.cg_api_key.expect("Please provide a CoinGecko API key");
-        let client = CoingeckoClient::new(config.cg_host_url, api_key);
 
-        Self {
-            client,
-        }
+        Self::new(config.cg_host_url, api_key)
     }
 
     pub fn new(host_url: String, api_key: String) -> Self {
@@ -44,7 +43,7 @@ impl CoingeckoPriceApi {
     }
 
     pub async fn get_prices(&self, assets: Vec<&AssetSpecifier>) -> Result<Vec<Quotation>, CoingeckoError> {
-        let coingecko_ids = assets.into_iter().filter_map(|asset| {
+        let coingecko_ids = assets.clone().into_iter().filter_map(|asset| {
             let id = self.convert_to_coingecko_id(asset);
             match id {
                 Some(id) => Some(id),
@@ -63,11 +62,14 @@ impl CoingeckoPriceApi {
             let asset = assets.iter().find(|asset| {
                 self.convert_to_coingecko_id(asset).as_deref() == Some(id.as_str())
             })?;
+            let price_usd = price.usd.unwrap_or_default();
+            let price_decimal = Decimal::from_f64(price_usd).expect("Could not convert price to Decimal");
+
             Some(Quotation {
                 symbol: asset.symbol.clone(),
                 name: asset.symbol.clone(),
                 blockchain: Some(asset.blockchain.clone()),
-                price: price.usd.map(|x| x.into()).unwrap_or_default(),
+                price: price_decimal,
                 time: chrono::Utc::now(),
             })
         }).collect();
@@ -283,19 +285,35 @@ mod tests {
         let price_api = CoingeckoPriceApi::new(host_url, api_key);
 
         let stellar_asset = AssetSpecifier {
-            blockchain: "CRYPTO".to_string(),
-            symbol: "STELLAR".to_string(),
+            blockchain: "Stellar".to_string(),
+            symbol: "XLM".to_string(),
         };
         let voucher_dot_asset = AssetSpecifier {
-            blockchain: "CRYPTO".to_string(),
-            symbol: "VOUCHER-DOT".to_string(),
+            blockchain: "Bifrost".to_string(),
+            symbol: "vDOT".to_string(),
         };
 
         let assets = vec![&stellar_asset, &voucher_dot_asset];
 
-        let prices = price_api.get_prices(assets).await;
-        assert!(prices.is_ok());
-        let prices = prices.unwrap();
-        assert_eq!(prices.len(), 2);
+        let quotations = price_api.get_prices(assets).await;
+        assert!(quotations.is_ok());
+        let quotations = quotations.unwrap();
+        assert_eq!(quotations.len(), 2);
+
+        let stellar_quotation = quotations.iter().find(|q| q.symbol == stellar_asset.symbol).expect("Should return a Stellar quotation");
+        assert_eq!(stellar_quotation.symbol, stellar_asset.symbol);
+        assert_eq!(stellar_quotation.name, stellar_asset.symbol);
+        assert_eq!(stellar_quotation.blockchain, Some(stellar_asset.blockchain));
+        assert!(stellar_quotation.price > Decimal::from_f64(0.0).unwrap());
+
+        let vdot_quotation = quotations.iter().find(|q| q.symbol == voucher_dot_asset.symbol).expect("Should return a vDOT quotation");
+        assert_eq!(vdot_quotation.symbol, voucher_dot_asset.symbol);
+        assert_eq!(vdot_quotation.name, voucher_dot_asset.symbol);
+        assert_eq!(vdot_quotation.blockchain, Some(voucher_dot_asset.blockchain));
+        assert!(vdot_quotation.price > Decimal::from_f64(0.0).unwrap());
+
+        let res = stellar_quotation.price.to_string();
+        let res2 = vdot_quotation.price.to_string();
+        assert_eq!(res, "0.0");
     }
 }
