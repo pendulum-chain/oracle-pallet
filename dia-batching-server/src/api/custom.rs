@@ -5,19 +5,19 @@ use chrono::prelude::*;
 use graphql_client::{GraphQLQuery, Response};
 use rust_decimal::Decimal;
 use serde::Deserialize;
-
+use crate::api::error::CustomError;
 use crate::api::Quotation;
 use crate::AssetSpecifier;
 
 pub struct CustomPriceApi;
 
 impl CustomPriceApi {
-    pub async fn get_price(asset: &AssetSpecifier) -> Result<Quotation, Box<dyn Error + Send + Sync>> {
+    pub async fn get_price(asset: &AssetSpecifier) -> Result<Quotation, CustomError> {
         if AmpePriceView::supports(asset) {
             return AmpePriceView::get_price().await;
         }
 
-        Err("Unsupported custom asset".into())
+        Err(CustomError(format!("Unsupported asset: {:?}", asset)))
     }
 
     pub fn is_supported(asset: &AssetSpecifier) -> bool {
@@ -70,14 +70,18 @@ impl AmpePriceView {
     /// }
     /// ```
     /// Returns the value of `eth_price`, which is the price of AMPE.
-    async fn get_price() -> Result<Quotation, Box<dyn Error + Send + Sync>> {
+    async fn get_price() -> Result<Quotation, CustomError> {
         let request_body = AmpePriceView::build_query(ampe_price_view::Variables {});
 
         let client = reqwest::Client::new();
-        let response = client.post(Self::URL).json(&request_body).send().await?;
-        let response_body: Response<ampe_price_view::ResponseData> = response.json().await?;
+        let response = client.post(Self::URL).json(&request_body).send().await.map_err(
+            |e| CustomError(format!("Failed to send request: {:?}", e))
+        )?;
+        let response_body: Response<ampe_price_view::ResponseData> = response.json().await.map_err(
+            |e| CustomError(format!("Failed to parse response: {:?}", e))
+        )?;
 
-        let response_data = response_body.data.ok_or("No price found for AMPE")?;
+        let response_data = response_body.data.ok_or(CustomError("No price found for AMPE".to_string()))?;
         let price = response_data.bundle_by_id.eth_price;
 
         Ok(Quotation {

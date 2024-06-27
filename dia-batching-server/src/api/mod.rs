@@ -9,7 +9,8 @@ use crate::AssetSpecifier;
 use futures::future::join_all;
 use rust_decimal::Decimal;
 use serde::Deserialize;
-use crate::api::error::{ApiError, PolygonError};
+use crate::api::error::{CoingeckoError, CustomError, PolygonError};
+pub use crate::api::error::ApiError;
 
 mod coingecko;
 mod custom;
@@ -35,7 +36,7 @@ pub trait PriceApi {
     async fn get_quotations(
         &self,
         assets: Vec<&AssetSpecifier>,
-    ) -> Result<Vec<Quotation>, Box<dyn Error + Sync + Send>>;
+    ) -> Result<Vec<Quotation>, ApiError>;
 }
 
 pub struct PriceApiImpl {
@@ -57,7 +58,7 @@ impl PriceApi for PriceApiImpl {
     async fn get_quotations(
         &self,
         assets: Vec<&AssetSpecifier>,
-    ) -> Result<Vec<Quotation>, Box<dyn Error + Sync + Send>> {
+    ) -> Result<Vec<Quotation>, ApiError> {
         let mut quotations = Vec::new();
 
         // First, get fiat quotations
@@ -108,19 +109,15 @@ impl PriceApiImpl {
     async fn get_crypto_quotations(
         &self,
         assets: Vec<&AssetSpecifier>,
-    ) -> Result<Vec<Quotation>, ApiError> {
-        let quotations = self.coingecko_price_api.get_prices(assets).await.map_err(
-            |e| {
-                ApiError::CoingeckoError(e)
-            },
-        )?;
+    ) -> Result<Vec<Quotation>, CoingeckoError> {
+        let quotations = self.coingecko_price_api.get_prices(assets).await?;
         Ok(quotations)
     }
 
     async fn get_custom_quotations(
         &self,
         assets: Vec<&AssetSpecifier>,
-    ) -> Result<Vec<Quotation>, Box<dyn Error + Sync + Send>> {
+    ) -> Result<Vec<Quotation>, CustomError> {
         let mut quotations = Vec::new();
         for asset in assets {
             let quotation = CustomPriceApi::get_price(asset).await?;

@@ -116,7 +116,7 @@ mod tests {
     use async_trait::async_trait;
     use chrono::Utc;
     use rust_decimal_macros::dec;
-
+    use crate::api::ApiError;
     use super::*;
 
     struct MockDia {
@@ -192,7 +192,7 @@ mod tests {
 
     #[async_trait]
     impl PriceApi for MockDia {
-        async fn get_quotations(&self, assets: Vec<&AssetSpecifier>) -> Result<Vec<Quotation>, Box<dyn Error + Sync + Send>> {
+        async fn get_quotations(&self, assets: Vec<&AssetSpecifier>) -> Result<Vec<Quotation>, ApiError> {
             todo!()
         }
     }
