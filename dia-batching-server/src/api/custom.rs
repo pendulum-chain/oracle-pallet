@@ -13,11 +13,16 @@ pub struct CustomPriceApi;
 
 impl CustomPriceApi {
     pub async fn get_price(asset: &AssetSpecifier) -> Result<Quotation, CustomError> {
-        if AmpePriceView::supports(asset) {
-            return AmpePriceView::get_price().await;
+        if !Self::is_supported(asset) {
+            return Err(CustomError(format!("Unsupported asset: {:?}", asset)));
         }
 
-        Err(CustomError(format!("Unsupported asset: {:?}", asset)))
+        // Go through all the custom APIs and check if the asset is supported by any of them
+        if AmpePriceView::supports(asset) {
+            return AmpePriceView::get_price().await;
+        } else {
+            Err(CustomError("Unsupported asset".to_string()))
+        }
     }
 
     pub fn is_supported(asset: &AssetSpecifier) -> bool {
@@ -46,7 +51,7 @@ pub struct AmpePriceView;
 
 impl AssetCompatibility for AmpePriceView {
     fn supports(asset: &AssetSpecifier) -> bool {
-        asset.blockchain == "CRYPTO" && asset.symbol == "AMPE"
+        asset.blockchain == "Amplitude" && asset.symbol == "AMPE"
     }
 }
 
@@ -86,7 +91,7 @@ impl AmpePriceView {
 
         Ok(Quotation {
             symbol: Self::SYMBOL.to_string(),
-            name: Self::BLOCKCHAIN.to_string(),
+            name: Self::SYMBOL.to_string(),
             blockchain: Some(Self::BLOCKCHAIN.to_string()),
             price,
             time: Utc::now(),
@@ -97,27 +102,33 @@ impl AmpePriceView {
 #[cfg(test)]
 mod tests {
     use rust_decimal::Decimal;
-    use crate::api::PriceApiImpl;
+    use crate::api::custom::CustomPriceApi;
+    use crate::api::custom::AmpePriceView;
     use crate::api::PriceApi;
     use crate::AssetSpecifier;
 
     #[tokio::test]
-    async fn test_ampe_price() {
+    async fn test_get_ampe_price_from_api() {
         let asset = AssetSpecifier {
             blockchain: "Amplitude".to_string(),
             symbol: "AMPE".to_string(),
         };
-        let assets = vec![&asset];
 
-        let price_api = PriceApiImpl::new();
+        let ampe_quotation = CustomPriceApi::get_price(&asset).await.expect("should return a quotation");
 
-        let prices = price_api.get_quotations(assets).await.expect("should return a quotation");
+        assert_eq!(ampe_quotation.symbol, asset.symbol);
+        assert_eq!(ampe_quotation.name, asset.symbol);
+        assert_eq!(ampe_quotation.blockchain.expect("should return something"), asset.blockchain);
+        assert!(ampe_quotation.price > 0.into());
+    }
 
-        assert!(!prices.is_empty());
-        let ampe_quote = prices.first().expect("should return a price").clone();
+    #[tokio::test]
+    async fn test_get_ampe_price_from_view() {
+        let ampe_quotation = AmpePriceView::get_price().await.expect("should return a quotation");
 
-        assert_eq!(ampe_quote.symbol, "AMPE");
-        assert_eq!(ampe_quote.blockchain.expect("should return something"), "Amplitude");
-        assert!(ampe_quote.price > Decimal::new(0, 0));
+        assert_eq!(ampe_quotation.symbol, AmpePriceView::SYMBOL);
+        assert_eq!(ampe_quotation.name, AmpePriceView::SYMBOL);
+        assert_eq!(ampe_quotation.blockchain.expect("should return something"), AmpePriceView::BLOCKCHAIN);
+        assert!(ampe_quotation.price > 0.into());
     }
 }
