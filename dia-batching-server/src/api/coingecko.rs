@@ -1,26 +1,16 @@
-use std::error::Error;
-use crate::api::Quotation;
-use crate::AssetSpecifier;
-use serde::de::DeserializeOwned;
-use clap::Parser;
 use std::collections::HashMap;
+use std::error::Error;
 use std::fmt;
 
-#[derive(Debug)]
-struct CoingeckoError(String);
-
-impl fmt::Display for CoingeckoError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let CoingeckoError(ref err_msg) = *self;
-        // Log the error message
-        log::error!("CoingeckoError: {}", err_msg);
-        // Write the error message to the formatter
-        write!(f, "{}", err_msg)
-    }
-}
+use clap::Parser;
+use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
+use crate::api::error::CoingeckoError;
+use crate::api::Quotation;
+use crate::AssetSpecifier;
 
 #[derive(Parser, Debug, Clone)]
-struct CoingeckoConfig {
+pub struct CoingeckoConfig {
     /// The API key for CoinGecko.
     #[clap(long, env = "CG_API_KEY")]
     pub cg_api_key: Option<String>,
@@ -53,12 +43,57 @@ impl CoingeckoPriceApi {
         }
     }
 
-    pub async fn get_prices(assets: Vec<&AssetSpecifier>) -> Result<Vec<Quotation>, Box<dyn Error + Send + Sync>> {
-        Err("Unsupported asset".into())
+    pub async fn get_prices(&self, assets: Vec<&AssetSpecifier>) -> Result<Vec<Quotation>, CoingeckoError> {
+        let coingecko_ids = assets.into_iter().filter_map(|asset| {
+            let id = self.convert_to_coingecko_id(asset);
+            match id {
+                Some(id) => Some(id),
+                None => {
+                    log::warn!("Could not find CoinGecko ID for asset {:?}", asset);
+                    None
+                }
+            }
+        }).collect::<Vec<_>>();
+
+        let prices = self.client.price(&coingecko_ids, false, false, false, true).await.map_err(
+            |e| CoingeckoError(e.to_string())
+        )?;
+
+        let quotations = prices.into_iter().filter_map(|(id, price)| {
+            let asset = assets.iter().find(|asset| {
+                self.convert_to_coingecko_id(asset).as_deref() == Some(id.as_str())
+            })?;
+            Some(Quotation {
+                symbol: asset.symbol.clone(),
+                name: asset.symbol.clone(),
+                blockchain: Some(asset.blockchain.clone()),
+                price: price.usd.map(|x| x.into()).unwrap_or_default(),
+                time: chrono::Utc::now(),
+            })
+        }).collect();
+
+        Ok(quotations)
+    }
+
+    /// Maps the blockchain and symbol pair to the CoinGecko ID.
+    /// For now, this conversion is using a hard-coded list.
+    /// We need to change our on-chain data to use CoinGecko IDs in the future.
+    fn convert_to_coingecko_id(&self, asset: &AssetSpecifier) -> Option<String> {
+        match (asset.blockchain.as_str(), asset.symbol.as_str()) {
+            ("Pendulum", "PEN") => Some("pendulum".to_string()),
+            ("Polkadot", "DOT") => Some("polkadot".to_string()),
+            ("Kusama", "kusama") => Some("kusama".to_string()),
+            ("Astar", "ASTR") => Some("astar".to_string()),
+            ("Bifrost", "BNC") => Some("bifrost-native-coin".to_string()),
+            ("Bifrost", "vDOT") => Some("voucher-dot".to_string()),
+            ("HydraDX", "HDX") => Some("hydration".to_string()),
+            ("Moonbeam", "GLMR") => Some("moonbeam".to_string()),
+            ("Polkadex", "PDEX") => Some("polkadex".to_string()),
+            ("Stellar", "XLM") => Some("stellar".to_string()),
+            _ => None
+        }
     }
 }
-
-use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SimplePing {
@@ -159,7 +194,6 @@ impl CoingeckoClient {
         // We always query for full precision
         let precision = "full";
         let req = format!("/simple/price?ids={}&vs_currencies={}&precision={}&include_market_cap={}&include_24hr_vol={}&include_24hr_change={}&include_last_updated_at={}", ids.join("%2C"), vs_currencies.join("%2C"), precision, include_market_cap, include_24hr_vol, include_24hr_change, include_last_updated_at);
-        // TODO maybe use json::Value instead of Price for arbitrary values
         self.get(&req).await
     }
 }
@@ -167,6 +201,7 @@ impl CoingeckoClient {
 #[cfg(test)]
 mod tests {
     use std::env;
+
     use super::*;
 
     fn read_env_variable(key: &str) -> Option<String> {
@@ -247,6 +282,20 @@ mod tests {
 
         let price_api = CoingeckoPriceApi::new(host_url, api_key);
 
-        price_api.get_prices()
+        let stellar_asset = AssetSpecifier {
+            blockchain: "CRYPTO".to_string(),
+            symbol: "STELLAR".to_string(),
+        };
+        let voucher_dot_asset = AssetSpecifier {
+            blockchain: "CRYPTO".to_string(),
+            symbol: "VOUCHER-DOT".to_string(),
+        };
+
+        let assets = vec![&stellar_asset, &voucher_dot_asset];
+
+        let prices = price_api.get_prices(assets).await;
+        assert!(prices.is_ok());
+        let prices = prices.unwrap();
+        assert_eq!(prices.len(), 2);
     }
 }

@@ -1,17 +1,20 @@
 use std::error::Error;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use crate::api::coingecko::CoingeckoPriceApi;
+use clap::Parser;
+use crate::api::coingecko::{CoingeckoConfig, CoingeckoPriceApi};
 use crate::api::custom::{CustomPriceApi};
 use crate::api::polygon::PolygonPriceApi;
 use crate::AssetSpecifier;
 use futures::future::join_all;
 use rust_decimal::Decimal;
 use serde::Deserialize;
+use crate::api::error::ApiError;
 
 mod coingecko;
 mod custom;
 mod polygon;
+mod error;
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Quotation {
@@ -35,11 +38,15 @@ pub trait PriceApi {
     ) -> Result<Vec<Quotation>, Box<dyn Error + Sync + Send>>;
 }
 
-pub struct PriceApiImpl {}
+pub struct PriceApiImpl {
+    coingecko_price_api: CoingeckoPriceApi,
+}
 
 impl PriceApiImpl {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            coingecko_price_api: CoingeckoPriceApi::new_from_config(CoingeckoConfig::parse())
+        }
     }
 }
 
@@ -98,13 +105,17 @@ impl PriceApiImpl {
     async fn get_crypto_quotations(
         &self,
         assets: Vec<&AssetSpecifier>,
-    ) -> Result<Vec<Quotation>, Box<dyn Error + Sync + Send>> {
+    ) -> Result<Vec<Quotation>, ApiError> {
         let crypto_assets = assets
             .into_iter()
             .filter(|asset| asset.blockchain.to_uppercase() == "CRYPTO")
             .collect();
 
-        let quotations = CoingeckoPriceApi::get_prices(crypto_assets).await?;
+        let quotations = self.coingecko_price_api.get_prices(crypto_assets).await.map_err(
+            |e| {
+                ApiError::CoingeckoError(e)
+            },
+        )?;
         Ok(quotations)
     }
 

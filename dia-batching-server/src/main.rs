@@ -17,7 +17,7 @@ mod price_updater;
 mod storage;
 
 /// This struct is used to identify a specific asset.
-#[derive(PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct AssetSpecifier {
     blockchain: String,
     symbol: String,
