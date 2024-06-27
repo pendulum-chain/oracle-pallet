@@ -24,7 +24,7 @@ pub struct PolygonPriceApi {
 
 impl PolygonPriceApi {
     pub fn new_from_config(config: PolygonConfig) -> Self {
-        let api_key = config.pg_api_key.expect("Please provide a CoinGecko API key");
+        let api_key = config.pg_api_key.expect("Please provide a Polygon API key");
 
         Self::new(config.pg_host_url, api_key)
     }
@@ -42,7 +42,7 @@ impl PolygonPriceApi {
             match polygon_id {
                 Some(polygon_id) => Some((asset, polygon_id)),
                 None => {
-                    log::warn!("Unsupported asset: {:?}", asset);
+                    log::warn!("Unsupported polygon asset: {:?}", asset);
                     None
                 }
             }
@@ -51,9 +51,24 @@ impl PolygonPriceApi {
 
         let mut prices = Vec::new();
         for (asset, polygon_id) in polygon_ids {
-            let price = self.client.price(polygon_id.as_str()).await.map_err(
+            // We always return 1 USD as 1 USD
+            if polygon_id == "USD" {
+                let quotation = Quotation {
+                    symbol: "USD-USD".to_string(),
+                    name: "USD-USD".to_string(),
+                    blockchain: Some("FIAT".to_string()),
+                    price: Decimal::from(1),
+                    time: chrono::Utc::now(),
+                };
+                prices.push(quotation);
+                continue;
+            }
+
+
+            let price = self.client.price(polygon_id).await.map_err(
                 |e| PolygonError(e.to_string())
             )?;
+
             let symbol = asset.symbol.clone();
             let quotation = Quotation {
                 symbol: symbol.clone(),
@@ -151,7 +166,7 @@ impl PolygonClient {
     /// Get the current price of any fiat currency in USD
     pub async fn price(
         &self,
-        from_currency: &str,
+        from_currency: String,
     ) -> Result<PolygonPrice, PolygonError> {
         // Currencies have to be upper-case
         let from_currency = from_currency.to_uppercase();
@@ -198,7 +213,7 @@ mod tests {
     async fn test_fetching_price() {
         let client = create_client();
 
-        let result = client.price(&"brl").await;
+        let result = client.price("brl".to_string()).await;
 
         assert!(result.is_ok());
         let brl_price = result.unwrap();
@@ -256,5 +271,11 @@ mod tests {
         assert!(result.is_ok());
         let prices = result.unwrap();
         assert_eq!(prices.len(), assets.len());
+
+        let usd_price = prices.first().unwrap();
+        assert_eq!(usd_price.symbol, usd_asset.symbol);
+        assert_eq!(usd_price.name, usd_asset.symbol);
+        assert_eq!(usd_price.blockchain, Some("FIAT".to_string()));
+        assert_eq!(usd_price.price, 1.into());
     }
 }
