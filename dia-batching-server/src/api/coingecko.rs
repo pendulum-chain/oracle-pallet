@@ -2,14 +2,15 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
 
-use crate::api::error::CoingeckoError;
-use crate::api::Quotation;
-use crate::AssetSpecifier;
 use clap::Parser;
 use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+
+use crate::api::error::CoingeckoError;
+use crate::api::Quotation;
+use crate::AssetSpecifier;
 
 #[derive(Parser, Debug, Clone)]
 pub struct CoingeckoConfig {
@@ -96,7 +97,7 @@ impl CoingeckoPriceApi {
 		match (asset.blockchain.as_str(), asset.symbol.as_str()) {
 			("Pendulum", "PEN") => Some("pendulum".to_string()),
 			("Polkadot", "DOT") => Some("polkadot".to_string()),
-			("Kusama", "kusama") => Some("kusama".to_string()),
+			("Kusama", "KSM") => Some("kusama".to_string()),
 			("Astar", "ASTR") => Some("astar".to_string()),
 			("Bifrost", "BNC") => Some("bifrost-native-coin".to_string()),
 			("Bifrost", "vDOT") => Some("voucher-dot".to_string()),
@@ -163,12 +164,17 @@ impl CoingeckoClient {
 		match response {
 			Ok(response) => {
 				if !response.status().is_success() {
-					// return Err(reqwest::Error::from_str("Request failed"));
 					let result = response.text().await;
-					Err(CoingeckoError(result.unwrap()))
+					let err_msg = format!(
+						"CoinGecko API error: {}",
+						result.unwrap_or("Unknown".to_string()).trim()
+					);
+					Err(CoingeckoError(err_msg))
 				} else {
 					let result = response.json().await;
-					result.map_err(|e| CoingeckoError(e.to_string()))
+					result.map_err(|e| {
+						CoingeckoError(format!("Could not decode CoinGecko response: {}", e))
+					})
 				}
 			},
 			Err(e) => Err(CoingeckoError(e.to_string())),

@@ -1,8 +1,9 @@
-use crate::storage::{CoinInfo, CoinInfoStorage};
+use crate::storage::{CoinInfoStorage};
 use crate::AssetSpecifier;
 use actix_web::web::Json;
 use actix_web::{post, web};
 use serde::{Deserialize, Serialize};
+use crate::types::CoinInfo;
 
 #[post("/currencies")]
 pub async fn currencies_post(

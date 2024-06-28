@@ -10,9 +10,9 @@ pub enum ApiError {
 impl fmt::Display for ApiError {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
-			ApiError::CoingeckoError(e) | ApiError::CustomError(e) | ApiError::PolygonError(e) => {
-				write!(f, "{}", e)
-			},
+			ApiError::CoingeckoError(ref err) => write!(f, "{}", err),
+			ApiError::CustomError(ref err) => write!(f, "{}", err),
+			ApiError::PolygonError(ref err) => write!(f, "{}", err),
 		}
 	}
 }

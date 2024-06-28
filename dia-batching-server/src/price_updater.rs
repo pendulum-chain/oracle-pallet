@@ -1,6 +1,6 @@
 use crate::api::PriceApi;
-use crate::storage::{CoinInfo, CoinInfoStorage};
-use crate::types::Quotation;
+use crate::storage::{CoinInfoStorage};
+use crate::types::{CoinInfo, Quotation};
 use crate::AssetSpecifier;
 use log::{error, info};
 use rust_decimal::prelude::ToPrimitive;
