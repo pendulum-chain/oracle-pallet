@@ -1,25 +1,13 @@
 use std::collections::HashMap;
 
-use clap::Parser;
 use rust_decimal::Decimal;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
 use crate::api::error::CoingeckoError;
 use crate::api::Quotation;
+use crate::args::CoingeckoConfig;
 use crate::AssetSpecifier;
-
-#[derive(Parser, Debug, Clone)]
-pub struct CoingeckoConfig {
-	/// The API key for CoinGecko.
-	#[clap(long, env = "CG_API_KEY")]
-	pub cg_api_key: Option<String>,
-
-	/// The host URL for CoinGecko.
-	/// Defaults to the CoinGecko Pro API.
-	#[clap(long, env = "CG_HOST_URL", default_value = "https://pro-api.coingecko.com/api/v3")]
-	pub cg_host_url: String,
-}
 
 pub struct CoingeckoPriceApi {
 	client: CoingeckoClient,

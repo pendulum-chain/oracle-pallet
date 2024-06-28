@@ -9,7 +9,7 @@ use crate::types::AssetSpecifier;
 use actix_web::{web, App, HttpServer};
 use log::error;
 use std::sync::Arc;
-use structopt::StructOpt;
+use clap::Parser;
 
 mod api;
 mod args;
@@ -22,7 +22,7 @@ mod types;
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 	pretty_env_logger::init();
 
-	let args: DiaApiArgs = DiaApiArgs::from_args();
+	let args: DiaApiArgs = DiaApiArgs::parse();
 	let storage = Arc::new(CoinInfoStorage::default());
 	let data = web::Data::from(storage.clone());
 

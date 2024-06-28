@@ -1,21 +1,10 @@
 use crate::api::error::PolygonError;
 use crate::api::Quotation;
 use crate::AssetSpecifier;
-use clap::Parser;
 use rust_decimal::Decimal;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-
-#[derive(Parser, Debug, Clone)]
-pub struct PolygonConfig {
-	/// The API key for Polygon.io
-	#[clap(long, env = "PG_API_KEY")]
-	pub pg_api_key: Option<String>,
-
-	/// The host URL for the Polygon.io API.
-	#[clap(long, env = "PG_HOST_URL", default_value = "https://api.polygon.io/v1")]
-	pub pg_host_url: String,
-}
+use crate::args::PolygonConfig;
 
 pub struct PolygonPriceApi {
 	client: PolygonClient,

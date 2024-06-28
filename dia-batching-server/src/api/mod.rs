@@ -1,8 +1,9 @@
-use crate::api::coingecko::{CoingeckoConfig, CoingeckoPriceApi};
+use crate::api::coingecko::CoingeckoPriceApi;
 use crate::api::custom::CustomPriceApi;
 pub use crate::api::error::ApiError;
 use crate::api::error::{CoingeckoError, CustomError, PolygonError};
-use crate::api::polygon::{PolygonConfig, PolygonPriceApi};
+use crate::api::polygon::PolygonPriceApi;
+use crate::args::{CoingeckoConfig, PolygonConfig};
 use crate::types::Quotation;
 use crate::AssetSpecifier;
 use async_trait::async_trait;
