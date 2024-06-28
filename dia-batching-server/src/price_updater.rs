@@ -27,7 +27,7 @@ where
 
 			update_prices(coins, &supported_currencies, &api).await;
 
-			tokio::time::delay_for(update_interval.saturating_sub(time_elapsed.elapsed())).await;
+			tokio::time::sleep(update_interval.saturating_sub(time_elapsed.elapsed())).await;
 		}
 	});
 
