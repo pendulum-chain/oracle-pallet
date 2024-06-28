@@ -1,10 +1,10 @@
+use crate::types::CoinInfo;
+use crate::AssetSpecifier;
 use arc_swap::ArcSwap;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 use std::collections::HashMap;
 use std::sync::Arc;
-use crate::AssetSpecifier;
-use crate::types::CoinInfo;
 
 #[derive(Debug, Default)]
 pub struct CoinInfoStorage {
