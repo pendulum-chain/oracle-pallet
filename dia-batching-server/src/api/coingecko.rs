@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-
 use rust_decimal::Decimal;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -45,11 +44,8 @@ impl CoingeckoPriceApi {
 			})
 			.collect::<Vec<_>>();
 
-		let id_to_price_map = self
-			.client
-			.price(&coingecko_ids, false, false, false, true)
-			.await
-			.map_err(|e| {
+		let id_to_price_map =
+			self.client.price(&coingecko_ids, false, true, false, true).await.map_err(|e| {
 				CoingeckoError(format!("Couldn't query CoinGecko prices {}", e.to_string()))
 			})?;
 
@@ -60,12 +56,15 @@ impl CoingeckoPriceApi {
 					Self::convert_to_coingecko_id(asset).as_deref() == Some(id.as_str())
 				})?;
 
+				let supply = price.usd_24h_vol.unwrap_or_default();
+
 				Some(Quotation {
 					symbol: asset.symbol.clone(),
 					name: asset.symbol.clone(),
 					blockchain: Some(asset.blockchain.clone()),
 					price: price.usd,
-					time: chrono::Utc::now(),
+					supply,
+					time: price.last_updated_at,
 				})
 			})
 			.collect();
@@ -105,9 +104,9 @@ pub struct SimplePing {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CoingeckoPrice {
 	pub usd: Decimal,
-	pub usd_market_cap: Option<f64>,
-	pub usd_24h_vol: Option<f64>,
-	pub usd_24h_change: Option<f64>,
+	pub usd_market_cap: Option<Decimal>,
+	pub usd_24h_vol: Option<Decimal>,
+	pub usd_24h_change: Option<Decimal>,
 	pub last_updated_at: u64,
 }
 

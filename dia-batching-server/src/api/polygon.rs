@@ -49,7 +49,8 @@ impl PolygonPriceApi {
 					name: "USD-USD".to_string(),
 					blockchain: Some("FIAT".to_string()),
 					price: Decimal::from(1),
-					time: chrono::Utc::now(),
+					supply: Decimal::from(0),
+					time: chrono::Utc::now().timestamp().unsigned_abs(),
 				};
 				prices.push(quotation);
 				continue;
@@ -67,7 +68,8 @@ impl PolygonPriceApi {
 				name: symbol,
 				blockchain: Some("FIAT".to_string()),
 				price: price.converted,
-				time: chrono::Utc::now(),
+				supply: Decimal::from(0),
+				time: chrono::Utc::now().timestamp().unsigned_abs(),
 			};
 			prices.push(quotation);
 		}

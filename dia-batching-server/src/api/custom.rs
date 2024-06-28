@@ -97,7 +97,8 @@ impl AmpePriceView {
 			name: Self::SYMBOL.to_string(),
 			blockchain: Some(Self::BLOCKCHAIN.to_string()),
 			price,
-			time: Utc::now(),
+			supply: Decimal::from(0),
+			time: Utc::now().timestamp().unsigned_abs(),
 		})
 	}
 }

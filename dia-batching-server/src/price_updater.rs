@@ -35,17 +35,17 @@ where
 }
 
 fn convert_to_coin_info(value: Quotation) -> Result<CoinInfo, Box<dyn Error + Sync + Send>> {
-	let Quotation { name, symbol, blockchain, price, time, .. } = value;
+	let Quotation { name, symbol, blockchain, price, time, supply, .. } = value;
 
 	let price = convert_decimal_to_u128(&price)?;
-	let supply = 0;
+	let supply = convert_decimal_to_u128(&supply)?;
 
 	let coin_info = CoinInfo {
 		name: name.into(),
 		symbol: symbol.into(),
 		blockchain: blockchain.unwrap_or("FIAT".to_string()).into(),
 		price,
-		last_update_timestamp: time.timestamp().unsigned_abs(),
+		last_update_timestamp: time,
 		supply,
 	};
 
@@ -128,8 +128,9 @@ mod tests {
 					name: "BTC".into(),
 					price: dec!(1.000000000000),
 					symbol: "BTC".into(),
-					time: Utc::now(),
+					time: Utc::now().timestamp().unsigned_abs(),
 					blockchain: Some("Bitcoin".into()),
+					supply: Decimal::from(1),
 				},
 			);
 			quotation.insert(
@@ -138,8 +139,9 @@ mod tests {
 					name: "ETH".into(),
 					price: dec!(1.000000000000),
 					symbol: "ETH".into(),
-					time: Utc::now(),
+					time: Utc::now().timestamp().unsigned_abs(),
 					blockchain: Some("Ethereum".into()),
+					supply: Decimal::from(1),
 				},
 			);
 			quotation.insert(
@@ -148,8 +150,9 @@ mod tests {
 					name: "USDT".into(),
 					price: dec!(1.000000000001),
 					symbol: "USDT".into(),
-					time: Utc::now(),
+					time: Utc::now().timestamp().unsigned_abs(),
 					blockchain: Some("Ethereum".into()),
+					supply: Decimal::from(1),
 				},
 			);
 			quotation.insert(
@@ -158,8 +161,9 @@ mod tests {
 					name: "USDC".into(),
 					price: dec!(123456789.123456789012345),
 					symbol: "USDC".into(),
-					time: Utc::now(),
+					time: Utc::now().timestamp().unsigned_abs(),
 					blockchain: Some("Ethereum".into()),
+					supply: Decimal::from(1),
 				},
 			);
 			quotation.insert(
@@ -168,8 +172,9 @@ mod tests {
 					name: "MXNUSD=X".into(),
 					price: dec!(0.053712327),
 					symbol: "MXN-USD".into(),
-					time: Utc::now(),
+					time: Utc::now().timestamp().unsigned_abs(),
 					blockchain: None,
+					supply: Decimal::from(1),
 				},
 			);
 			quotation.insert(
@@ -179,7 +184,8 @@ mod tests {
 					name: "USD-X".to_string(),
 					blockchain: None,
 					price: Decimal::new(1, 0),
-					time: Utc::now(),
+					time: Utc::now().timestamp().unsigned_abs(),
+					supply: Decimal::from(1),
 				},
 			);
 			Self { quotation }
@@ -369,13 +375,13 @@ mod tests {
 		let c = storage.get_currencies_by_blockchains_and_symbols(supported_currencies);
 
 		assert_eq!(c[0].price, 1000000000000);
-		assert_eq!(c[0].supply, 0);
+		assert_eq!(c[0].supply, 1000000000000);
 
 		assert_eq!(c[1].price, 123456789123456789012);
-		assert_eq!(c[1].supply, 0);
+		assert_eq!(c[1].supply, 1000000000000);
 
 		assert_eq!(c[2].price, 1000000000001);
-		assert_eq!(c[2].supply, 0);
+		assert_eq!(c[2].supply, 1000000000000);
 
 		assert_eq!(c[0].name, "BTC");
 		assert_eq!(c[1].name, "USDC");

@@ -1,4 +1,3 @@
-use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
@@ -20,8 +19,10 @@ pub struct Quotation {
 	pub blockchain: Option<String>,
 	#[serde(rename(deserialize = "Price"))]
 	pub price: Decimal,
+	#[serde(rename(deserialize = "Supply"))]
+	pub supply: Decimal,
 	#[serde(rename(deserialize = "Time"))]
-	pub time: DateTime<Utc>,
+	pub time: u64,
 }
 
 /// This struct is used to store information about a coin.
