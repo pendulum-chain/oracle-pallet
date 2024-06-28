@@ -8,28 +8,14 @@ use crate::api::polygon::{PolygonConfig, PolygonPriceApi};
 use crate::AssetSpecifier;
 use futures::future::join_all;
 use rust_decimal::Decimal;
-use serde::Deserialize;
 use crate::api::error::{CoingeckoError, CustomError, PolygonError};
 pub use crate::api::error::ApiError;
+use crate::types::Quotation;
 
 mod coingecko;
 mod custom;
 mod polygon;
 mod error;
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct Quotation {
-    #[serde(rename(deserialize = "Symbol"))]
-    pub symbol: String,
-    #[serde(rename(deserialize = "Name"))]
-    pub name: String,
-    #[serde(rename(deserialize = "Blockchain"))]
-    pub blockchain: Option<String>,
-    #[serde(rename(deserialize = "Price"))]
-    pub price: Decimal,
-    #[serde(rename(deserialize = "Time"))]
-    pub time: DateTime<Utc>,
-}
 
 #[async_trait]
 pub trait PriceApi {
@@ -68,8 +54,9 @@ impl PriceApi for PriceApiImpl {
             .collect();
 
         let fiat_quotes = self.get_fiat_quotations(fiat_assets.clone()).await;
-        if let Ok(fiat_quotes) = fiat_quotes {
-            quotations.extend(fiat_quotes);
+        match fiat_quotes {
+            Ok(fiat_quotes) => quotations.extend(fiat_quotes),
+            Err(e) => log::error!("Error getting fiat quotations: {}", e)
         }
 
         // Then, get quotations for custom assets
@@ -79,8 +66,9 @@ impl PriceApi for PriceApiImpl {
             .collect();
 
         let custom_quotes = self.get_custom_quotations(custom_assets.clone()).await;
-        if let Ok(custom_quotes) = custom_quotes {
-            quotations.extend(custom_quotes);
+        match custom_quotes {
+            Ok(custom_quotes) => quotations.extend(custom_quotes),
+            Err(e) => log::error!("Error getting custom quotations: {}", e)
         }
 
         // Finally, get supported crypto quotations
@@ -89,8 +77,9 @@ impl PriceApi for PriceApiImpl {
         }).collect::<Vec<_>>();
 
         let crypto_quotes = self.get_crypto_quotations(crypto_assets).await;
-        if let Ok(crypto_quotes) = crypto_quotes {
-            quotations.extend(crypto_quotes);
+        match crypto_quotes {
+            Ok(crypto_quotes) => quotations.extend(crypto_quotes),
+            Err(e) => log::error!("Error getting crypto quotations: {}", e)
         }
 
         Ok(quotations)

@@ -4,17 +4,7 @@ use smol_str::SmolStr;
 use std::collections::HashMap;
 use std::sync::Arc;
 use crate::AssetSpecifier;
-
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CoinInfo {
-	pub symbol: SmolStr,
-	pub name: SmolStr,
-	pub blockchain: SmolStr,
-	pub supply: u128,
-	pub last_update_timestamp: u64,
-	pub price: u128,
-}
+use crate::types::CoinInfo;
 
 #[derive(Debug, Default)]
 pub struct CoinInfoStorage {

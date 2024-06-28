@@ -6,7 +6,8 @@ use rust_decimal::Decimal;
 use std::collections::HashSet;
 use std::fmt::{Display, Formatter};
 use std::{error::Error, sync::Arc};
-use crate::api::{PriceApi, Quotation};
+use crate::api::{PriceApi};
+use crate::types::Quotation;
 
 pub async fn run_update_prices_loop<T>(
     storage: Arc<CoinInfoStorage>,

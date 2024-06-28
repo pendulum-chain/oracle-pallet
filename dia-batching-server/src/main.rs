@@ -10,19 +10,14 @@ use std::sync::Arc;
 use structopt::StructOpt;
 use crate::api::PriceApiImpl;
 use serde::{Deserialize, Serialize};
+use crate::types::AssetSpecifier;
 
 mod api;
 mod args;
 mod handlers;
 mod price_updater;
 mod storage;
-
-/// This struct is used to identify a specific asset.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
-pub struct AssetSpecifier {
-    blockchain: String,
-    symbol: String,
-}
+mod types;
 
 #[actix_web::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
