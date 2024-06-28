@@ -24,7 +24,7 @@ pub struct DiaApiArgs {
 	/// Fiat currencies need to have the format FIAT:<from>-<to>
 	#[structopt(short, long,
         parse(from_str = parse_currency_vec),
-        default_value = "FIAT:USD-USD,FIAT:BRL-USD,FIAT:AUD-USD,FIAT:NGN-USD,CRYPTO:PEN,CRYPTO:AMPE,CRYPTO:STELLAR,CRYPTO:MOONBEAM,CRYPTO:DOT,CRYPTO:KSM,CRYPTO:VOUCHER-DOT"
+        default_value = "FIAT:USD-USD,FIAT:EUR-USD,FIAT:BRL-USD,FIAT:AUD-USD,FIAT:NGN-USD,FIAT:TZS-USD,Pendulum:PEN,Amplitude:AMPE,Polkadot:DOT,Kusama:KSM,Astar:ASTR,Bifrost:BNC,Bifrost:vDOT,HydraDX:HDX,Moonbeam:GLMR,Polkadex:PDEX,Stellar:XLM"
     )]
 	pub supported_currencies: SupportedCurrencies,
 }
