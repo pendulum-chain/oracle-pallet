@@ -28,6 +28,10 @@ pub struct DiaApiArgs {
     )]
 	pub supported_currencies: SupportedCurrencies,
 
+	/// The port to run the server on
+	#[clap(short, long, default_value = "8070")]
+	pub port: u16,
+
 	#[clap(flatten)]
 	pub coingecko_config: CoingeckoConfig,
 	#[clap(flatten)]

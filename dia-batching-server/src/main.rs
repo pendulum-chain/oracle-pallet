@@ -55,10 +55,11 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 	)
 	.await?;
 
-	println!("Running dia-batching-server... (Press CTRL+C to quit)");
+	let port = args.port;
+	println!("Running dia-batching-server on port {port}... (Press CTRL+C to quit)");
 	HttpServer::new(move || App::new().app_data(data.clone()).service(currencies_post))
 		.on_connect(|_, _| println!("Serving Request"))
-		.bind("0.0.0.0:8070")?
+		.bind(format!("0.0.0.0:{port}"))?
 		.run()
 		.await?;
 
