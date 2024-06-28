@@ -1,13 +1,12 @@
-use crate::storage::{CoinInfoStorage};
+use crate::storage::CoinInfoStorage;
+use crate::types::CoinInfo;
 use crate::AssetSpecifier;
 use actix_web::web::Json;
 use actix_web::{post, web};
-use serde::{Deserialize, Serialize};
-use crate::types::CoinInfo;
 
 #[post("/currencies")]
 pub async fn currencies_post(
-	web::Json(currencies): web::Json<Vec<AssetSpecifier>>,
+	Json(currencies): Json<Vec<AssetSpecifier>>,
 	storage: web::Data<CoinInfoStorage>,
 ) -> Json<Vec<CoinInfo>> {
 	println!("Request currencies {:?}", currencies);

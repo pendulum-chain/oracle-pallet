@@ -1,11 +1,10 @@
-use crate::api::error::{CoingeckoError, PolygonError};
+use crate::api::error::PolygonError;
 use crate::api::Quotation;
 use crate::AssetSpecifier;
 use clap::Parser;
 use rust_decimal::Decimal;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use std::error::Error;
 
 #[derive(Parser, Debug, Clone)]
 pub struct PolygonConfig {

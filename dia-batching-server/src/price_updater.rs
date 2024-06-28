@@ -1,5 +1,5 @@
 use crate::api::PriceApi;
-use crate::storage::{CoinInfoStorage};
+use crate::storage::CoinInfoStorage;
 use crate::types::{CoinInfo, Quotation};
 use crate::AssetSpecifier;
 use log::{error, info};

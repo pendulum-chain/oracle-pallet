@@ -1,9 +1,6 @@
 use std::collections::HashMap;
-use std::error::Error;
-use std::fmt;
 
 use clap::Parser;
-use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -64,7 +61,9 @@ impl CoingeckoPriceApi {
 			.client
 			.price(&coingecko_ids, false, false, false, true)
 			.await
-			.map_err(|e| CoingeckoError(e.to_string()))?;
+			.map_err(|e| {
+				CoingeckoError(format!("Couldn't query CoinGecko prices {}", e.to_string()))
+			})?;
 
 		let quotations = id_to_price_map
 			.into_iter()
@@ -141,7 +140,7 @@ impl CoingeckoClient {
 
 		// We supply a different header for the demo API
 		let mut api_key = reqwest::header::HeaderValue::from_str(self.api_key.as_str())
-			.expect("Could not create header value");
+			.map_err(|e| CoingeckoError(format!("Could not set API key header value: {}", e)))?;
 		api_key.set_sensitive(true);
 		if self.host.contains("pro-api") {
 			headers.insert("x-cg-pro-api-key", api_key);
@@ -182,6 +181,7 @@ impl CoingeckoClient {
 	}
 
 	/// Check API server status
+	#[allow(dead_code)]
 	pub async fn ping(&self) -> Result<SimplePing, CoingeckoError> {
 		self.get("/ping").await
 	}

@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::string::ToString;
 
 use crate::api::error::CustomError;
@@ -7,7 +6,6 @@ use crate::AssetSpecifier;
 use chrono::prelude::*;
 use graphql_client::{GraphQLQuery, Response};
 use rust_decimal::Decimal;
-use serde::Deserialize;
 
 pub struct CustomPriceApi;
 

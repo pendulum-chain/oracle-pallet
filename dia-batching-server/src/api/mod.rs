@@ -6,11 +6,7 @@ use crate::api::polygon::{PolygonConfig, PolygonPriceApi};
 use crate::types::Quotation;
 use crate::AssetSpecifier;
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use clap::Parser;
-use futures::future::join_all;
-use rust_decimal::Decimal;
-use std::error::Error;
 
 mod coingecko;
 mod custom;

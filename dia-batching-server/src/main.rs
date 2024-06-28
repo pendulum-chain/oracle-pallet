@@ -8,7 +8,6 @@ use crate::args::DiaApiArgs;
 use crate::types::AssetSpecifier;
 use actix_web::{web, App, HttpServer};
 use log::error;
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use structopt::StructOpt;
 
