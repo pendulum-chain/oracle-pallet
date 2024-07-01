@@ -29,8 +29,8 @@ impl PolygonPriceApi {
 		let asset_and_source_currency = assets
 			.into_iter()
 			.filter_map(|asset| {
-				let source_curreny = PolygonPriceApi::extract_source_currency(asset);
-				match source_curreny {
+				let source_currency = PolygonPriceApi::extract_source_currency(asset);
+				match source_currency {
 					Some(polygon_id) => Some((asset, polygon_id)),
 					None => {
 						log::warn!("Unsupported polygon asset: {:?}", asset);
