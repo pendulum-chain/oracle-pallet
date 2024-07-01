@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use rust_decimal::Decimal;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 use crate::api::error::CoingeckoError;
 use crate::api::Quotation;
@@ -33,14 +33,10 @@ impl CoingeckoPriceApi {
 			.clone()
 			.into_iter()
 			.filter_map(|asset| {
-				let id = Self::convert_to_coingecko_id(asset);
-				match id {
-					Some(id) => Some(id),
-					None => {
-						log::warn!("Could not find CoinGecko ID for asset {:?}", asset);
-						None
-					},
-				}
+				Self::convert_to_coingecko_id(asset).or_else(|| {
+					log::warn!("Could not find CoinGecko ID for asset {:?}", asset);
+					None
+				})
 			})
 			.collect::<Vec<_>>();
 
@@ -145,26 +141,21 @@ impl CoingeckoClient {
 		)
 		.expect("Invalid URL");
 
-		let response = client.get(url).send().await;
+		let response =
+			client.get(url).send().await.map_err(|e| {
+				CoingeckoError(format!("Failed to send request: {}", e.to_string()))
+			})?;
 
-		match response {
-			Ok(response) => {
-				if !response.status().is_success() {
-					let result = response.text().await;
-					let err_msg = format!(
-						"CoinGecko API error: {}",
-						result.unwrap_or("Unknown".to_string()).trim()
-					);
-					Err(CoingeckoError(err_msg))
-				} else {
-					let result = response.json().await;
-					result.map_err(|e| {
-						CoingeckoError(format!("Could not decode CoinGecko response: {}", e))
-					})
-				}
-			},
-			Err(e) => Err(CoingeckoError(e.to_string())),
+		if !response.status().is_success() {
+			let result = response.text().await;
+			return Err(CoingeckoError(format!(
+				"CoinGecko API error: {}",
+				result.unwrap_or("Unknown".to_string()).trim()
+			)));
 		}
+
+		let result = response.json().await;
+		result.map_err(|e| CoingeckoError(format!("Could not decode CoinGecko response: {}", e)))
 	}
 
 	/// Check API server status
@@ -185,7 +176,6 @@ impl CoingeckoClient {
 		let ids = ids.iter().map(AsRef::as_ref).collect::<Vec<_>>();
 		// We always query for USD
 		let vs_currencies = vec!["usd"];
-		let vs_currencies = vs_currencies.iter().map(AsRef::as_ref).collect::<Vec<_>>();
 		// We always query for full precision
 		let precision = "full";
 		let req = format!("/simple/price?ids={}&vs_currencies={}&precision={}&include_market_cap={}&include_24hr_vol={}&include_24hr_change={}&include_last_updated_at={}", ids.join("%2C"), vs_currencies.join("%2C"), precision, include_market_cap, include_24hr_vol, include_24hr_change, include_last_updated_at);

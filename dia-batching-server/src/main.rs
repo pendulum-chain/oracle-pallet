@@ -7,9 +7,9 @@ use crate::api::PriceApiImpl;
 use crate::args::DiaApiArgs;
 use crate::types::AssetSpecifier;
 use actix_web::{web, App, HttpServer};
+use clap::Parser;
 use log::error;
 use std::sync::Arc;
-use clap::Parser;
 
 mod api;
 mod args;

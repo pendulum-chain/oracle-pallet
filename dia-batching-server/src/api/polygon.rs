@@ -1,10 +1,10 @@
 use crate::api::error::PolygonError;
 use crate::api::Quotation;
+use crate::args::PolygonConfig;
 use crate::AssetSpecifier;
 use rust_decimal::Decimal;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use crate::args::PolygonConfig;
 
 pub struct PolygonPriceApi {
 	client: PolygonClient,
@@ -143,24 +143,22 @@ impl PolygonClient {
 		)
 		.expect("Invalid URL");
 
-		let response = client.get(url).send().await;
+		let response = client
+			.get(url)
+			.send()
+			.await
+			.map_err(|e| PolygonError(format!("Failed to send request: {}", e.to_string())))?;
 
-		match response {
-			Ok(response) => {
-				if !response.status().is_success() {
-					let result = response.text().await;
-					Err(PolygonError(result.unwrap()))
-				} else {
-					let result = response.json().await;
-					result.map_err(|e| {
-						PolygonError(
-							"Could not decode Polygon response: ".to_owned() + &e.to_string(),
-						)
-					})
-				}
-			},
-			Err(e) => Err(PolygonError(e.to_string())),
+		if !response.status().is_success() {
+			let result = response.text().await;
+			return Err(PolygonError(format!(
+				"Polygon API error: {}",
+				result.unwrap_or("Unknown".to_string()).trim()
+			)));
 		}
+
+		let result = response.json().await;
+		result.map_err(|e| PolygonError(format!("Could not decode Polygon response: {}", e)))
 	}
 
 	/// Get the current price of any fiat currency in USD
