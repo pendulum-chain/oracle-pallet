@@ -237,7 +237,7 @@ pub mod pallet {
 				.join(&b',');
 
 			if supported_currencies.len() == 0 {
-				return Ok(())
+				return Ok(());
 			}
 
 			let supported_currencies: Vec<_> =
