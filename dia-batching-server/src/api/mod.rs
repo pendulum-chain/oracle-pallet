@@ -1,6 +1,5 @@
 use crate::api::coingecko::CoingeckoPriceApi;
 use crate::api::custom::CustomPriceApi;
-pub use crate::api::error::ApiError;
 use crate::api::error::{CoingeckoError, CustomError, PolygonError};
 use crate::api::polygon::PolygonPriceApi;
 use crate::args::{CoingeckoConfig, PolygonConfig};
@@ -16,10 +15,11 @@ mod polygon;
 
 #[async_trait]
 pub trait PriceApi {
-	async fn get_quotations(
-		&self,
-		assets: Vec<&AssetSpecifier>,
-	) -> Result<Vec<Quotation>, ApiError>;
+	/// A method to get quotations for a list of assets.
+	/// The method will return a list of quotations for the assets that are supported by the API.
+	/// If an asset is not supported, the method will log an error and continue.
+	/// The method will return an empty list if no quotations are available.
+	async fn get_quotations(&self, assets: Vec<&AssetSpecifier>) -> Vec<Quotation>;
 }
 
 pub struct PriceApiImpl {
@@ -38,10 +38,7 @@ impl PriceApiImpl {
 
 #[async_trait]
 impl PriceApi for PriceApiImpl {
-	async fn get_quotations(
-		&self,
-		assets: Vec<&AssetSpecifier>,
-	) -> Result<Vec<Quotation>, ApiError> {
+	async fn get_quotations(&self, assets: Vec<&AssetSpecifier>) -> Vec<Quotation> {
 		let mut quotations = Vec::new();
 
 		// First, get fiat quotations
@@ -82,7 +79,7 @@ impl PriceApi for PriceApiImpl {
 			Err(e) => log::error!("Error getting crypto quotations: {}", e),
 		}
 
-		Ok(quotations)
+		quotations
 	}
 }
 

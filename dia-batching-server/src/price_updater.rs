@@ -68,7 +68,6 @@ async fn update_prices<T>(
 
 	api.get_quotations(supported_currencies)
 		.await
-		.unwrap_or_default()
 		.into_iter()
 		.for_each(|quotation| match convert_to_coin_info(quotation) {
 			Ok(coin_info) => currencies.push(coin_info),
@@ -107,10 +106,9 @@ fn convert_decimal_to_u128(input: &Decimal) -> Result<u128, ConvertingError> {
 
 #[cfg(test)]
 mod tests {
-	use std::{collections::HashMap, error::Error, sync::Arc};
+	use std::{collections::HashMap, sync::Arc};
 
 	use super::*;
-	use crate::api::ApiError;
 	use async_trait::async_trait;
 	use chrono::Utc;
 	use rust_decimal_macros::dec;
@@ -194,17 +192,14 @@ mod tests {
 
 	#[async_trait]
 	impl PriceApi for MockDia {
-		async fn get_quotations(
-			&self,
-			assets: Vec<&AssetSpecifier>,
-		) -> Result<Vec<Quotation>, ApiError> {
+		async fn get_quotations(&self, assets: Vec<&AssetSpecifier>) -> Vec<Quotation> {
 			let mut quotations = Vec::new();
 			for asset in assets {
 				if let Some(q) = self.quotation.get(asset) {
 					quotations.push(q.clone());
 				}
 			}
-			Ok(quotations)
+			quotations
 		}
 	}
 

@@ -182,7 +182,6 @@ impl PolygonClient {
 
 #[cfg(test)]
 mod tests {
-	use crate::api::coingecko::CoingeckoClient;
 	use crate::api::polygon::{PolygonClient, PolygonPriceApi};
 	use crate::AssetSpecifier;
 	use std::env;

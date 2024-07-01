@@ -1,23 +1,5 @@
 use std::fmt;
 
-#[allow(dead_code)]
-#[derive(Debug)]
-pub enum ApiError {
-	CoingeckoError(CoingeckoError),
-	CustomError(CustomError),
-	PolygonError(PolygonError),
-}
-
-impl fmt::Display for ApiError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match self {
-			ApiError::CoingeckoError(ref err) => write!(f, "{}", err),
-			ApiError::CustomError(ref err) => write!(f, "{}", err),
-			ApiError::PolygonError(ref err) => write!(f, "{}", err),
-		}
-	}
-}
-
 #[derive(Debug)]
 pub struct CoingeckoError(pub String);
 

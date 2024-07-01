@@ -107,9 +107,7 @@ impl AmpePriceView {
 mod tests {
 	use crate::api::custom::AmpePriceView;
 	use crate::api::custom::CustomPriceApi;
-	use crate::api::PriceApi;
 	use crate::AssetSpecifier;
-	use rust_decimal::Decimal;
 
 	#[tokio::test]
 	async fn test_get_ampe_price_from_api() {
