@@ -35,7 +35,7 @@ where
 }
 
 fn convert_to_coin_info(value: Quotation) -> Result<CoinInfo, Box<dyn Error + Sync + Send>> {
-	let Quotation { name, symbol, blockchain, price, time, supply, .. } = value;
+	let Quotation { name, symbol, blockchain, price, time, supply } = value;
 
 	let price = convert_decimal_to_u128(&price)?;
 	let supply = convert_decimal_to_u128(&supply)?;
