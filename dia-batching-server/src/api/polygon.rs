@@ -94,7 +94,13 @@ impl PolygonPriceApi {
 		if parts.len() != 2 {
 			return None;
 		}
+
 		let from_currency = parts.get(0)?;
+		let target_currency = parts.get(1)?;
+		if target_currency.to_uppercase() != "USD" {
+			log::info!("Unsupported target currency: {}", target_currency);
+			return None;
+		}
 		Some(from_currency.to_uppercase())
 	}
 }
