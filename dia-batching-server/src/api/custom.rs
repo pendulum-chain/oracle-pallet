@@ -1,5 +1,5 @@
 use std::string::ToString;
-
+use async_trait::async_trait;
 use crate::api::error::CustomError;
 use crate::api::Quotation;
 use crate::AssetSpecifier;
@@ -11,30 +11,34 @@ pub struct CustomPriceApi;
 
 impl CustomPriceApi {
 	pub async fn get_price(asset: &AssetSpecifier) -> Result<Quotation, CustomError> {
-		if !Self::is_supported(asset) {
-			return Err(CustomError(format!("Unsupported asset: {:?}", asset)));
-		}
-
-		// Go through all the custom APIs and check if the asset is supported by any of them
-		if AmpePriceView::supports(asset) {
-			return AmpePriceView::get_price().await;
-		} else {
-			Err(CustomError("Unsupported asset".to_string()))
-		}
+		let api =
+			Self::get_supported_api(asset).ok_or(CustomError("Unsupported asset".to_string()))?;
+		api.get_price(asset).await
 	}
 
 	pub fn is_supported(asset: &AssetSpecifier) -> bool {
-		let custom_assets: Vec<AssetSpecifier> = vec![AssetSpecifier {
-			blockchain: "Amplitude".to_string(),
-			symbol: "AMPE".to_string(),
-		}];
+		Self::get_supported_api(asset).is_some()
+	}
 
-		custom_assets.iter().any(|supported_asset| supported_asset == asset)
+	/// Iterates over all supported APIs and returns the first one that supports the given asset.
+	fn get_supported_api(asset: &AssetSpecifier) -> Option<Box<dyn AssetCompatibility>> {
+		let compatible_apis: Vec<Box<dyn AssetCompatibility>> = vec![Box::new(AmpePriceView)];
+
+		for api in compatible_apis {
+			if api.supports(asset) {
+				return Some(api);
+			}
+		}
+
+		None
 	}
 }
 
-trait AssetCompatibility {
-	fn supports(asset: &AssetSpecifier) -> bool;
+#[async_trait]
+trait AssetCompatibility: Send {
+	fn supports(&self, asset: &AssetSpecifier) -> bool;
+
+	async fn get_price(&self, asset: &AssetSpecifier) -> Result<Quotation, CustomError>;
 }
 
 // The paths are relative to the directory where your `Cargo.toml` is located.
@@ -47,9 +51,14 @@ trait AssetCompatibility {
 )]
 pub struct AmpePriceView;
 
+#[async_trait]
 impl AssetCompatibility for AmpePriceView {
-	fn supports(asset: &AssetSpecifier) -> bool {
+	fn supports(&self, asset: &AssetSpecifier) -> bool {
 		asset.blockchain == "Amplitude" && asset.symbol == "AMPE"
+	}
+
+	async fn get_price(&self, _asset: &AssetSpecifier) -> Result<Quotation, CustomError> {
+		AmpePriceView::get_price().await
 	}
 }
 
