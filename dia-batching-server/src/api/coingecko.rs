@@ -76,17 +76,20 @@ impl CoingeckoPriceApi {
 	/// For now, this conversion is using a hard-coded list.
 	/// We need to change our on-chain data to use CoinGecko IDs in the future.
 	fn convert_to_coingecko_id(asset: &AssetSpecifier) -> Option<String> {
-		match (asset.blockchain.as_str(), asset.symbol.as_str()) {
-			("Pendulum", "PEN") => Some("pendulum".to_string()),
-			("Polkadot", "DOT") => Some("polkadot".to_string()),
-			("Kusama", "KSM") => Some("kusama".to_string()),
-			("Astar", "ASTR") => Some("astar".to_string()),
-			("Bifrost", "BNC") => Some("bifrost-native-coin".to_string()),
-			("Bifrost", "vDOT") => Some("voucher-dot".to_string()),
-			("HydraDX", "HDX") => Some("hydration".to_string()),
-			("Moonbeam", "GLMR") => Some("moonbeam".to_string()),
-			("Polkadex", "PDEX") => Some("polkadex".to_string()),
-			("Stellar", "XLM") => Some("stellar".to_string()),
+		// Capitalize the blockchain and symbol
+		let blockchain = asset.blockchain.to_uppercase().as_str();
+		let symbol = asset.symbol.to_uppercase().as_str();
+		match (blockchain, symbol) {
+			("PENDULUM", "PEN") => Some("pendulum".to_string()),
+			("POLKADOT", "DOT") => Some("polkadot".to_string()),
+			("KUSAMA", "KSM") => Some("kusama".to_string()),
+			("ASTAR", "ASTR") => Some("astar".to_string()),
+			("BIFROST", "BNC") => Some("bifrost-native-coin".to_string()),
+			("BIFROST", "vDOT") => Some("voucher-dot".to_string()),
+			("HYDRADX", "HDX") => Some("hydration".to_string()),
+			("MOONBEAM", "GLMR") => Some("moonbeam".to_string()),
+			("POLKADEX", "PDEX") => Some("polkadex".to_string()),
+			("STELLAR", "XLM") => Some("stellar".to_string()),
 			_ => None,
 		}
 	}
@@ -161,7 +164,7 @@ impl CoingeckoClient {
 	/// Check API server status
 	#[allow(dead_code)]
 	pub async fn ping(&self) -> Result<SimplePing, CoingeckoError> {
-		self.get("/ping").await
+		self.get("/api/v3/ping").await
 	}
 
 	/// Get the current price of any cryptocurrencies vs USD with full precision
@@ -178,7 +181,7 @@ impl CoingeckoClient {
 		let vs_currencies = vec!["usd"];
 		// We always query for full precision
 		let precision = "full";
-		let req = format!("/simple/price?ids={}&vs_currencies={}&precision={}&include_market_cap={}&include_24hr_vol={}&include_24hr_change={}&include_last_updated_at={}", ids.join("%2C"), vs_currencies.join("%2C"), precision, include_market_cap, include_24hr_vol, include_24hr_change, include_last_updated_at);
+		let req = format!("/api/v3/simple/price?ids={}&vs_currencies={}&precision={}&include_market_cap={}&include_24hr_vol={}&include_24hr_change={}&include_last_updated_at={}", ids.join("%2C"), vs_currencies.join("%2C"), precision, include_market_cap, include_24hr_vol, include_24hr_change, include_last_updated_at);
 		self.get(&req).await
 	}
 }
@@ -201,7 +204,7 @@ mod tests {
 	fn get_coingecko_variables() -> (String, String) {
 		let api_key = read_env_variable("CG_API_KEY").expect("Please provide a CoinGecko API key");
 		let host_url = read_env_variable("CG_HOST_URL")
-			.unwrap_or("https://pro-api.coingecko.com/api/v3".to_string());
+			.unwrap_or("https://pro-api.coingecko.com".to_string());
 		(api_key, host_url)
 	}
 
