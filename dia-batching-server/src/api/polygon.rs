@@ -5,6 +5,7 @@ use crate::AssetSpecifier;
 use rust_decimal::Decimal;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 pub struct PolygonPriceApi {
 	client: PolygonClient,
@@ -22,56 +23,70 @@ impl PolygonPriceApi {
 
 		Self { client }
 	}
+
 	pub async fn get_prices(
 		&self,
 		assets: Vec<&AssetSpecifier>,
 	) -> Result<Vec<Quotation>, PolygonError> {
-		let asset_and_source_currency = assets
+		// Map used for the reverse lookup of ticker to asset specifier
+		let mut ticker_to_asset_map: HashMap<String, AssetSpecifier> = HashMap::new();
+
+		let from_currency_ticker_names = assets
 			.into_iter()
-			.filter_map(|asset| {
-				let source_currency = PolygonPriceApi::extract_source_currency(asset);
-				match source_currency {
-					Some(polygon_id) => Some((asset, polygon_id)),
-					None => {
-						log::warn!("Unsupported polygon asset: {:?}", asset);
-						None
-					},
-				}
+			.filter_map(|asset| match Self::extract_source_currency(asset) {
+				Some(currency) => {
+					let source_currency_ticker =
+						PolygonClient::currency_to_ticker(currency.as_str());
+					// Insert the asset into the map
+					ticker_to_asset_map.insert(source_currency_ticker.clone(), asset.clone());
+					Some(source_currency_ticker)
+				},
+				None => {
+					log::warn!("Unsupported polygon asset: {:?}", asset);
+					None
+				},
 			})
 			.collect::<Vec<_>>();
 
+		let quotes = self.client.all_tickers(&from_currency_ticker_names).await?;
+
 		let mut prices = Vec::new();
-		for (asset, source_currency) in asset_and_source_currency {
-			// We always return 1 USD as 1 USD
-			if source_currency == "USD" {
-				let quotation = Quotation {
-					symbol: "USD-USD".to_string(),
-					name: "USD-USD".to_string(),
-					blockchain: Some("FIAT".to_string()),
-					price: Decimal::from(1),
-					supply: Decimal::from(0),
-					time: chrono::Utc::now().timestamp().unsigned_abs(),
-				};
-				prices.push(quotation);
-				continue;
-			}
 
-			let price = self
-				.client
-				.price(source_currency)
-				.await
-				.map_err(|e| PolygonError(e.to_string()))?;
-
-			let symbol = asset.symbol.clone();
+		// Add extra handling for USD if it was requested as it will not be in the quotes
+		if from_currency_ticker_names.contains(&PolygonClient::currency_to_ticker("USD")) {
 			let quotation = Quotation {
-				symbol: symbol.clone(),
-				name: symbol,
+				symbol: "USD-USD".to_string(),
+				name: "USD-USD".to_string(),
 				blockchain: Some("FIAT".to_string()),
-				price: price.converted,
+				price: Decimal::from(1),
 				supply: Decimal::from(0),
 				time: chrono::Utc::now().timestamp().unsigned_abs(),
 			};
 			prices.push(quotation);
+		}
+
+		for (ticker_name, quote) in quotes {
+			if let Some(asset) = ticker_to_asset_map.get(ticker_name.as_str()) {
+				let symbol = asset.symbol.clone();
+				// We use the bid price as the price
+				let price = quote.b;
+				// We don't have supply information for fiat currencies
+				let supply = Decimal::from(0);
+				// We use the current time as the time
+				let time = chrono::Utc::now().timestamp().unsigned_abs();
+
+				let quotation = Quotation {
+					symbol: symbol.clone(),
+					name: symbol,
+					blockchain: Some("FIAT".to_string()),
+					price,
+					supply,
+					time,
+				};
+				prices.push(quotation);
+			} else {
+				log::warn!("Could not find asset for ticker: {}", ticker_name);
+			}
 		}
 
 		Ok(prices)
@@ -116,6 +131,30 @@ pub struct PolygonPrice {
 	pub status: String,
 	pub symbol: String,
 	pub to: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TickerQuote {
+	/// Ask price
+	pub a: Decimal,
+	/// Bid price
+	pub b: Decimal,
+	/// Timestamp (milliseconds)
+	pub t: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Ticker {
+	pub ticker: String,
+	pub updated: u64,
+	#[serde(rename = "lastQuote")]
+	pub last_quote: TickerQuote,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct Tickers {
+	pub tickers: Vec<Ticker>,
+	pub status: String,
 }
 
 /// Polygon network client
@@ -179,10 +218,32 @@ impl PolygonClient {
 		let amount = "1";
 
 		let req = format!(
-			"conversion/{}/{}?amount={}&precision={}",
+			"v1/conversion/{}/{}?amount={}&precision={}",
 			from_currency, to_currency, amount, precision
 		);
 		self.get(&req).await
+	}
+
+	pub async fn all_tickers(
+		&self,
+		from_currency_tickers: &Vec<String>,
+	) -> Result<HashMap<String, TickerQuote>, PolygonError> {
+		let from_currencies = from_currency_tickers.join(",");
+		let req =
+			format!("v2/snapshot/locale/global/markets/forex/tickers?tickers={}", from_currencies);
+
+		let tickers: Tickers = self.get(&req).await?;
+		let mut quotes = HashMap::new();
+		for ticker in tickers.tickers {
+			quotes.insert(ticker.ticker, ticker.last_quote);
+		}
+
+		Ok(quotes)
+	}
+
+	/// Convert a currency to a ticker with USD as the target currency.
+	fn currency_to_ticker(from_currency: &str) -> String {
+		format!("C:{}USD", from_currency)
 	}
 }
 
@@ -204,7 +265,7 @@ mod tests {
 	fn get_polygon_variables() -> (String, String) {
 		let api_key = read_env_variable("PG_API_KEY").expect("Please provide a Polygon API key");
 		let host_url =
-			read_env_variable("PG_HOST_URL").unwrap_or("https://api.polygon.io/v1".to_string());
+			read_env_variable("PG_HOST_URL").unwrap_or("https://api.polygon.io".to_string());
 		(api_key, host_url)
 	}
 
@@ -243,13 +304,19 @@ mod tests {
 		let prices = result.unwrap();
 		assert_eq!(prices.len(), assets.len());
 
-		let brl_price = prices.first().unwrap();
+		let brl_price = prices
+			.iter()
+			.find(|q| q.symbol == brl_asset.symbol)
+			.expect("Should find BRL price");
 		assert_eq!(brl_price.symbol, brl_asset.symbol);
 		assert_eq!(brl_price.name, brl_asset.symbol);
 		assert_eq!(brl_price.blockchain, Some("FIAT".to_string()));
 		assert!(brl_price.price > 0.into());
 
-		let eur_price = prices.last().unwrap();
+		let eur_price = prices
+			.iter()
+			.find(|q| q.symbol == eur_asset.symbol)
+			.expect("Should find EUR price");
 		assert_eq!(eur_price.symbol, eur_asset.symbol);
 		assert_eq!(eur_price.name, eur_asset.symbol);
 		assert_eq!(eur_price.blockchain, Some("FIAT".to_string()));
@@ -270,10 +337,56 @@ mod tests {
 		let prices = result.unwrap();
 		assert_eq!(prices.len(), assets.len());
 
-		let usd_price = prices.first().unwrap();
+		let usd_price = prices.first().expect("Should return a price");
 		assert_eq!(usd_price.symbol, usd_asset.symbol);
 		assert_eq!(usd_price.name, usd_asset.symbol);
 		assert_eq!(usd_price.blockchain, Some("FIAT".to_string()));
 		assert_eq!(usd_price.price, 1.into());
+	}
+
+	#[tokio::test]
+	async fn test_api_returns_price_for_usd_with_others() {
+		let (api_key, host_url) = get_polygon_variables();
+
+		let polygon_api = PolygonPriceApi::new(host_url, api_key);
+		let brl_asset =
+			AssetSpecifier { blockchain: "FIAT".to_string(), symbol: "BRL-USD".to_string() };
+		let eur_asset =
+			AssetSpecifier { blockchain: "FIAT".to_string(), symbol: "EUR-USD".to_string() };
+		let usd_asset =
+			AssetSpecifier { blockchain: "FIAT".to_string(), symbol: "USD-USD".to_string() };
+		let assets = vec![&usd_asset, &brl_asset, &eur_asset];
+
+		let result = polygon_api.get_prices(assets.clone()).await;
+		assert!(result.is_ok());
+		let prices = result.unwrap();
+		assert_eq!(prices.len(), assets.len());
+
+		let usd_price = prices
+			.iter()
+			.find(|q| q.symbol == usd_asset.symbol)
+			.expect("Should return a USD price");
+		assert_eq!(usd_price.symbol, usd_asset.symbol);
+		assert_eq!(usd_price.name, usd_asset.symbol);
+		assert_eq!(usd_price.blockchain, Some("FIAT".to_string()));
+		assert_eq!(usd_price.price, 1.into());
+
+		let brl_price = prices
+			.iter()
+			.find(|q| q.symbol == brl_asset.symbol)
+			.expect("Should return a BRL price");
+		assert_eq!(brl_price.symbol, brl_asset.symbol);
+		assert_eq!(brl_price.name, brl_asset.symbol);
+		assert_eq!(brl_price.blockchain, Some("FIAT".to_string()));
+		assert!(brl_price.price > 0.into());
+
+		let eur_price = prices
+			.iter()
+			.find(|q| q.symbol == eur_asset.symbol)
+			.expect("Should return a EUR price");
+		assert_eq!(eur_price.symbol, eur_asset.symbol);
+		assert_eq!(eur_price.name, eur_asset.symbol);
+		assert_eq!(eur_price.blockchain, Some("FIAT".to_string()));
+		assert!(eur_price.price > 0.into());
 	}
 }
