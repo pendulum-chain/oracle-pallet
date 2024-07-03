@@ -16,7 +16,7 @@ pub struct SupportedCurrencies(pub Vec<String>);
 #[clap(name = "dia-batching-server")]
 pub struct DiaApiArgs {
 	/// Iteration duration after one batch of requests
-	#[clap(short, long, default_value = "10")]
+	#[clap(short, long, env = "UPDATE_INTERVAL_SECONDS", default_value = "10")]
 	pub update_interval_seconds: u64,
 
 	/// Currencies to support
@@ -24,12 +24,13 @@ pub struct DiaApiArgs {
 	/// Fiat currencies need to have the format FIAT:<from>-<to>
 	#[clap(short, long,
         parse(from_str = parse_currency_vec),
+		env = "SUPPORTED_CURRENCIES",
         default_value = "FIAT:USD-USD,FIAT:EUR-USD,FIAT:BRL-USD,FIAT:AUD-USD,FIAT:NGN-USD,FIAT:TZS-USD,Pendulum:PEN,Amplitude:AMPE,Polkadot:DOT,Kusama:KSM,Astar:ASTR,Bifrost:BNC,Bifrost:vDOT,HydraDX:HDX,Moonbeam:GLMR,Polkadex:PDEX,Stellar:XLM"
     )]
 	pub supported_currencies: SupportedCurrencies,
 
 	/// The port to run the server on
-	#[clap(short, long, default_value = "8070")]
+	#[clap(short, long, env = "PORT", default_value = "8070")]
 	pub port: u16,
 
 	#[clap(flatten)]
@@ -46,7 +47,7 @@ pub struct CoingeckoConfig {
 
 	/// The host URL for CoinGecko.
 	/// Defaults to the CoinGecko Pro API.
-	#[clap(long, env = "CG_HOST_URL", default_value = "https://pro-api.coingecko.com/api/v3")]
+	#[clap(long, env = "CG_HOST_URL", default_value = "https://pro-api.coingecko.com")]
 	pub cg_host_url: String,
 }
 
@@ -57,6 +58,6 @@ pub struct PolygonConfig {
 	pub pg_api_key: Option<String>,
 
 	/// The host URL for the Polygon.io API.
-	#[clap(long, env = "PG_HOST_URL", default_value = "https://api.polygon.io/v1")]
+	#[clap(long, env = "PG_HOST_URL", default_value = "https://api.polygon.io")]
 	pub pg_host_url: String,
 }
