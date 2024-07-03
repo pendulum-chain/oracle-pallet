@@ -77,15 +77,15 @@ impl CoingeckoPriceApi {
 	/// We need to change our on-chain data to use CoinGecko IDs in the future.
 	fn convert_to_coingecko_id(asset: &AssetSpecifier) -> Option<String> {
 		// Capitalize the blockchain and symbol
-		let blockchain = asset.blockchain.to_uppercase().as_str();
-		let symbol = asset.symbol.to_uppercase().as_str();
-		match (blockchain, symbol) {
+		let blockchain = asset.blockchain.to_uppercase();
+		let symbol = asset.symbol.to_uppercase();
+		match (blockchain.as_str(), symbol.as_str()) {
 			("PENDULUM", "PEN") => Some("pendulum".to_string()),
 			("POLKADOT", "DOT") => Some("polkadot".to_string()),
 			("KUSAMA", "KSM") => Some("kusama".to_string()),
 			("ASTAR", "ASTR") => Some("astar".to_string()),
 			("BIFROST", "BNC") => Some("bifrost-native-coin".to_string()),
-			("BIFROST", "vDOT") => Some("voucher-dot".to_string()),
+			("BIFROST", "VDOT") => Some("voucher-dot".to_string()),
 			("HYDRADX", "HDX") => Some("hydration".to_string()),
 			("MOONBEAM", "GLMR") => Some("moonbeam".to_string()),
 			("POLKADEX", "PDEX") => Some("polkadex".to_string()),
@@ -203,8 +203,8 @@ mod tests {
 
 	fn get_coingecko_variables() -> (String, String) {
 		let api_key = read_env_variable("CG_API_KEY").expect("Please provide a CoinGecko API key");
-		let host_url = read_env_variable("CG_HOST_URL")
-			.unwrap_or("https://pro-api.coingecko.com".to_string());
+		let host_url =
+			read_env_variable("CG_HOST_URL").unwrap_or("https://pro-api.coingecko.com".to_string());
 		(api_key, host_url)
 	}
 

@@ -1,11 +1,11 @@
-use std::string::ToString;
-use async_trait::async_trait;
 use crate::api::error::CustomError;
 use crate::api::Quotation;
 use crate::AssetSpecifier;
+use async_trait::async_trait;
 use chrono::prelude::*;
 use graphql_client::{GraphQLQuery, Response};
 use rust_decimal::Decimal;
+use std::string::ToString;
 
 pub struct CustomPriceApi;
 
