@@ -29,14 +29,22 @@ impl CoingeckoPriceApi {
 		&self,
 		assets: Vec<&AssetSpecifier>,
 	) -> Result<Vec<Quotation>, CoingeckoError> {
+		// Map used for the reverse lookup of the CoinGecko ID to the asset
+		let mut id_to_asset_map: HashMap<String, AssetSpecifier> = HashMap::new();
+
 		let coingecko_ids = assets
 			.clone()
 			.into_iter()
 			.filter_map(|asset| {
-				Self::convert_to_coingecko_id(asset).or_else(|| {
-					log::warn!("Could not find CoinGecko ID for asset {:?}", asset);
-					None
-				})
+				Self::convert_to_coingecko_id(asset)
+					.and_then(|id| {
+						id_to_asset_map.insert(id.clone(), asset.clone());
+						Some(id)
+					})
+					.or_else(|| {
+						log::warn!("Could not find CoinGecko ID for asset {:?}", asset);
+						None
+					})
 			})
 			.collect::<Vec<_>>();
 
@@ -48,9 +56,7 @@ impl CoingeckoPriceApi {
 		let quotations = id_to_price_map
 			.into_iter()
 			.filter_map(|(id, price)| {
-				let asset = assets.iter().find(|asset| {
-					Self::convert_to_coingecko_id(asset).as_deref() == Some(id.as_str())
-				})?;
+				let asset = id_to_asset_map.get(&id)?;
 
 				let supply = price.usd_24h_vol.unwrap_or_default();
 
