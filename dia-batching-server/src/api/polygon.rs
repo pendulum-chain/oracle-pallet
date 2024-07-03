@@ -206,6 +206,7 @@ impl PolygonClient {
 		result.map_err(|e| PolygonError(format!("Could not decode Polygon response: {}", e)))
 	}
 
+	#[allow(dead_code)]
 	/// Get the current price of any fiat currency in USD
 	pub async fn price(&self, from_currency: String) -> Result<PolygonPrice, PolygonError> {
 		// Currencies have to be upper-case
