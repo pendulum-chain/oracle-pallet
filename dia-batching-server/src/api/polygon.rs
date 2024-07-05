@@ -77,6 +77,12 @@ impl PolygonPriceApi {
 					ticker.prev_day.c
 				};
 
+				if price == 0.into() {
+					log::warn!("Price for {} is 0", symbol);
+					// We don't want to return a Quotation if the price is 0
+					continue;
+				}
+
 				// We don't have supply information for fiat currencies
 				let supply = Decimal::from(0);
 				// We use the current time as the time
