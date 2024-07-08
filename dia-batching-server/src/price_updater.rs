@@ -49,9 +49,6 @@ fn convert_to_coin_info(value: Quotation) -> Result<CoinInfo, Box<dyn Error + Sy
 		supply,
 	};
 
-	info!("Coin Price: {:#?}", price);
-	info!("Coin Info : {:#?}", coin_info);
-
 	Ok(coin_info)
 }
 

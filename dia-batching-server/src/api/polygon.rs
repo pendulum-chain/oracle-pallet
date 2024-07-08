@@ -73,12 +73,13 @@ impl PolygonPriceApi {
 					// If the bid price is available on the last quote, we use it
 					ticker.last_quote.b
 				} else {
+					log::warn!("No bid price available for {symbol} in last quote. Falling back to quote from previous day.");
 					// Otherwise we use the close price of the previous day
 					ticker.prev_day.c
 				};
 
 				if price == 0.into() {
-					log::warn!("Price for {} is 0", symbol);
+					log::warn!("Price for {} is 0. Not returning quotation", symbol);
 					// We don't want to return a Quotation if the price is 0
 					continue;
 				}
