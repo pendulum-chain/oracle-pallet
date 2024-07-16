@@ -86,13 +86,13 @@ impl CoingeckoPriceApi {
 		let blockchain = asset.blockchain.to_uppercase();
 		let symbol = asset.symbol.to_uppercase();
 		match (blockchain.as_str(), symbol.as_str()) {
-			("PENDULUM", "PEN") => Some("pendulum".to_string()),
+			("PENDULUM", "PEN") => Some("pendulum-chain".to_string()),
 			("POLKADOT", "DOT") => Some("polkadot".to_string()),
 			("KUSAMA", "KSM") => Some("kusama".to_string()),
 			("ASTAR", "ASTR") => Some("astar".to_string()),
 			("BIFROST", "BNC") => Some("bifrost-native-coin".to_string()),
 			("BIFROST", "VDOT") => Some("voucher-dot".to_string()),
-			("HYDRADX", "HDX") => Some("hydration".to_string()),
+			("HYDRADX", "HDX") => Some("hydradx".to_string()),
 			("MOONBEAM", "GLMR") => Some("moonbeam".to_string()),
 			("POLKADEX", "PDEX") => Some("polkadex".to_string()),
 			("STELLAR", "XLM") => Some("stellar".to_string()),
@@ -276,34 +276,54 @@ mod tests {
 
 		let price_api = CoingeckoPriceApi::new(host_url, api_key);
 
-		let stellar_asset =
-			AssetSpecifier { blockchain: "Stellar".to_string(), symbol: "XLM".to_string() };
+		let pen_asset =
+			AssetSpecifier { blockchain: "Pendulum".to_string(), symbol: "PEN".to_string() };
+		let polkadot_asset =
+			AssetSpecifier { blockchain: "Polkadot".to_string(), symbol: "DOT".to_string() };
+		let kusama_asset =
+			AssetSpecifier { blockchain: "Kusama".to_string(), symbol: "KSM".to_string() };
+		let astar_asset =
+			AssetSpecifier { blockchain: "Astar".to_string(), symbol: "ASTR".to_string() };
+		let bifrost_asset =
+			AssetSpecifier { blockchain: "Bifrost".to_string(), symbol: "BNC".to_string() };
 		let voucher_dot_asset =
 			AssetSpecifier { blockchain: "Bifrost".to_string(), symbol: "vDOT".to_string() };
+		let hydradx_asset =
+			AssetSpecifier { blockchain: "HydraDX".to_string(), symbol: "HDX".to_string() };
+		let moonbeam_asset =
+			AssetSpecifier { blockchain: "Moonbeam".to_string(), symbol: "GLMR".to_string() };
+		let polkadex_asset =
+			AssetSpecifier { blockchain: "Polkadex".to_string(), symbol: "PDEX".to_string() };
+		let stellar_asset =
+			AssetSpecifier { blockchain: "Stellar".to_string(), symbol: "XLM".to_string() };
 
-		let assets = vec![&stellar_asset, &voucher_dot_asset];
+		let assets = vec![
+			&pen_asset,
+			&polkadot_asset,
+			&kusama_asset,
+			&astar_asset,
+			&bifrost_asset,
+			&voucher_dot_asset,
+			&hydradx_asset,
+			&moonbeam_asset,
+			&polkadex_asset,
+			&stellar_asset,
+		];
 
-		let quotations = price_api.get_prices(assets).await;
+		let quotations = price_api.get_prices(assets.clone()).await;
 		assert!(quotations.is_ok());
 		let quotations = quotations.unwrap();
-		assert_eq!(quotations.len(), 2);
 
-		let stellar_quotation = quotations
-			.iter()
-			.find(|q| q.symbol == stellar_asset.symbol)
-			.expect("Should return a Stellar quotation");
-		assert_eq!(stellar_quotation.symbol, stellar_asset.symbol);
-		assert_eq!(stellar_quotation.name, stellar_asset.symbol);
-		assert_eq!(stellar_quotation.blockchain, Some(stellar_asset.blockchain));
-		assert!(stellar_quotation.price > 0.into());
-
-		let vdot_quotation = quotations
-			.iter()
-			.find(|q| q.symbol == voucher_dot_asset.symbol)
-			.expect("Should return a vDOT quotation");
-		assert_eq!(vdot_quotation.symbol, voucher_dot_asset.symbol);
-		assert_eq!(vdot_quotation.name, voucher_dot_asset.symbol);
-		assert_eq!(vdot_quotation.blockchain, Some(voucher_dot_asset.blockchain));
-		assert!(vdot_quotation.price > 0.into());
+		// Check if all assets have a quotation and if not, print the missing ones
+		for asset in assets {
+			let quotation = quotations
+				.iter()
+				.find(|q| q.symbol == asset.symbol)
+				.expect(format!("Could not find a quotation for asset specifier {:?}", asset).as_str());
+			assert_eq!(quotation.symbol, asset.symbol);
+			assert_eq!(quotation.name, asset.symbol);
+			assert_eq!(quotation.blockchain, Some(asset.blockchain.clone()));
+			assert!(quotation.price > 0.into());
+		}
 	}
 }
