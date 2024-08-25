@@ -96,6 +96,7 @@ impl CoingeckoPriceApi {
 			("MOONBEAM", "GLMR") => Some("moonbeam".to_string()),
 			("POLKADEX", "PDEX") => Some("polkadex".to_string()),
 			("STELLAR", "XLM") => Some("stellar".to_string()),
+			("PICASSO", "PICA") => Some("picasso".to_string()),
 			_ => None,
 		}
 	}
@@ -296,6 +297,8 @@ mod tests {
 			AssetSpecifier { blockchain: "Polkadex".to_string(), symbol: "PDEX".to_string() };
 		let stellar_asset =
 			AssetSpecifier { blockchain: "Stellar".to_string(), symbol: "XLM".to_string() };
+		let picasso_asset =
+			AssetSpecifier { blockchain: "Picasso".to_string(), symbol: "PICA".to_string() };
 
 		let assets = vec![
 			&pen_asset,
@@ -308,6 +311,7 @@ mod tests {
 			&moonbeam_asset,
 			&polkadex_asset,
 			&stellar_asset,
+			&picasso_asset,
 		];
 
 		let quotations = price_api.get_prices(assets.clone()).await;
