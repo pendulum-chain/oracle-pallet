@@ -1,21 +1,16 @@
-use crate::storage::{CoinInfo, CoinInfoStorage};
+use crate::storage::CoinInfoStorage;
+use crate::types::CoinInfo;
+use crate::AssetSpecifier;
 use actix_web::web::Json;
 use actix_web::{post, web};
-use serde::{Deserialize, Serialize};
 
 #[post("/currencies")]
 pub async fn currencies_post(
-	web::Json(currencies): web::Json<Vec<Currency>>,
+	Json(currencies): Json<Vec<AssetSpecifier>>,
 	storage: web::Data<CoinInfoStorage>,
 ) -> Json<Vec<CoinInfo>> {
 	println!("Request currencies {:?}", currencies);
 	Json(storage.get_ref().get_currencies_by_blockchains_and_symbols(currencies))
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct Currency {
-	pub blockchain: String,
-	pub symbol: String,
 }
 
 #[cfg(test)]
@@ -43,8 +38,8 @@ mod tests {
 		let req = test::TestRequest::post()
 			.uri("http://localhost:8080/currencies")
 			.set_json(&vec![
-				Currency { blockchain: "Bitcoin".into(), symbol: "BTC".into() },
-				Currency { blockchain: "Ethereum".into(), symbol: "ETH".into() },
+				AssetSpecifier { blockchain: "Bitcoin".into(), symbol: "BTC".into() },
+				AssetSpecifier { blockchain: "Ethereum".into(), symbol: "ETH".into() },
 			])
 			.to_request();
 
@@ -64,9 +59,10 @@ mod tests {
 
 		let mut app =
 			test::init_service(App::new().app_data(data.clone()).service(currencies_post)).await;
+		let vec: Vec<AssetSpecifier> = vec![];
 		let req = test::TestRequest::post()
 			.uri("http://localhost:8080/currencies")
-			.set_json::<Vec<Currency>>(&vec![])
+			.set_json(vec)
 			.to_request();
 
 		let resp = test::call_service(&mut app, req).await;
@@ -86,7 +82,7 @@ mod tests {
 			test::init_service(App::new().app_data(data.clone()).service(currencies_post)).await;
 		let req = test::TestRequest::post()
 			.uri("http://localhost:8080/currencies")
-			.set_json(&vec![Currency { blockchain: "Bitcoin".into(), symbol: "DASH".into() }])
+			.set_json(&vec![AssetSpecifier { blockchain: "Bitcoin".into(), symbol: "DASH".into() }])
 			.to_request();
 
 		let resp = test::call_service(&mut app, req).await;
@@ -108,8 +104,8 @@ mod tests {
 		let req = test::TestRequest::post()
 			.uri("http://localhost:8080/currencies")
 			.set_json(&vec![
-				Currency { blockchain: "Bitcoin".into(), symbol: "DASH".into() },
-				Currency { blockchain: "Ethereum".into(), symbol: "ETH".into() },
+				AssetSpecifier { blockchain: "Bitcoin".into(), symbol: "DASH".into() },
+				AssetSpecifier { blockchain: "Ethereum".into(), symbol: "ETH".into() },
 			])
 			.to_request();
 
@@ -131,9 +127,10 @@ mod tests {
 
 		let mut app =
 			test::init_service(App::new().app_data(data.clone()).service(currencies_post)).await;
+		let vec: Vec<AssetSpecifier> = vec![];
 		let req = test::TestRequest::post()
 			.uri("http://localhost:8080/currencies")
-			.set_json::<Vec<Currency>>(&vec![])
+			.set_json(vec)
 			.to_request();
 
 		let resp = test::call_service(&mut app, req).await;
@@ -153,7 +150,7 @@ mod tests {
 			test::init_service(App::new().app_data(data.clone()).service(currencies_post)).await;
 		let req = test::TestRequest::post()
 			.uri("http://localhost:8080/currencies")
-			.set_json(&vec![Currency { blockchain: "Bitcoin".into(), symbol: "$COIN".into() }])
+			.set_json(vec![AssetSpecifier { blockchain: "Bitcoin".into(), symbol: "$COIN".into() }])
 			.to_request();
 
 		let resp = test::call_service(&mut app, req).await;

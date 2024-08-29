@@ -1,10 +1,10 @@
 use codec::{Decode, Encode};
 use frame_support::{sp_runtime::DispatchError};
 use sp_std::vec::Vec;
-use serde::{Deserialize, Deserializer, Serialize};
 use scale_info::TypeInfo;
 #[cfg(feature = "std")]
 use serde::Serializer;
+use serde::{Deserialize, Deserializer, Serialize};
 
 // TODO: Maybe it should be moved to it's own crate
 pub trait DiaOracle {
@@ -16,16 +16,7 @@ pub trait DiaOracle {
 }
 
 #[derive(
-	Encode,
-	Decode,
-	TypeInfo,
-	Debug,
-	Clone,
-	PartialEq,
-	Eq,
-	Default,
-	Deserialize,
-	Serialize,
+    Encode, Decode, TypeInfo, Debug, Clone, PartialEq, Eq, Default, Deserialize, Serialize,
 )]
 #[serde(rename_all = "camelCase")]
 pub struct CoinInfo {
