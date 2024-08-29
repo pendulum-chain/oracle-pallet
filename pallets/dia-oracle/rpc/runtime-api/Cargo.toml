@@ -39,3 +39,8 @@ std = [
 	'frame-support/std',
 	"dia-oracle/std",
 ]
+
+runtime-benchmarks = [
+	"dia-oracle/runtime-benchmarks",
+	"frame-support/runtime-benchmarks"
+]
