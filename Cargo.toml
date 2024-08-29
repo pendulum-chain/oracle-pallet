@@ -8,3 +8,4 @@ members = [
     'pallets/dia-oracle/rpc',
     'pallets/dia-oracle/rpc/runtime-api',
 ]
+
