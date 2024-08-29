@@ -4,8 +4,8 @@ use super::*;
 #[allow(unused)]
 use crate::Pallet as DiaOracle;
 use frame_benchmarking::{account, benchmarks, impl_benchmark_test_suite, whitelisted_caller};
-use frame_support::sp_std::{vec, vec::Vec};
 use frame_system::RawOrigin;
+use sp_std::{vec, vec::Vec};
 
 benchmarks! {
 	add_currency {
