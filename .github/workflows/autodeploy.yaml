@@ -1,0 +1,16 @@
+name: Gitlab Pipeline Executor
+run-name: Gitlab Pipeline Executor
+on:
+  push:
+    branches:
+      - main
+jobs:
+  Execute-Gitlab-Pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: Triggers Gitlab Pipeline
+        run: |
+          ls ${{ github.workspace }}
+          curl -X POST -F token=${{ secrets.GITLAB_TRIGGER }} -F "ref=development" -F "variables[ENABLECOMPILATION]=Y" -F "variables[COMPILEDIA]=Y" -F "variables[RELEASEDIA]=Y" -F "variables[CREATEDOCKER]=Y" -F "variables[STARTSTOP]=Y" -F "variables[DEPLOY]=Y" https://gitlab.com/api/v4/projects/${{ secrets.PROJECT_ID }}/trigger/pipeline
