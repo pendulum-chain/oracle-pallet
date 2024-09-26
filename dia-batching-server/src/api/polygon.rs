@@ -396,9 +396,13 @@ mod tests {
 			AssetSpecifier { blockchain: "FIAT".to_string(), symbol: "TZS-USD".to_string() };
 		let aud_asset =
 			AssetSpecifier { blockchain: "FIAT".to_string(), symbol: "AUD-USD".to_string() };
+		let ars_asset =
+			AssetSpecifier { blockchain: "FIAT".to_string(), symbol: "ARS-USD".to_string() };
+		let pen_asset =
+			AssetSpecifier { blockchain: "FIAT".to_string(), symbol: "PEN-USD".to_string() };
 		let usd_asset =
 			AssetSpecifier { blockchain: "FIAT".to_string(), symbol: "USD-USD".to_string() };
-		let assets = vec![&usd_asset, &brl_asset, &eur_asset, &ngn_asset, &tzs_asset, &aud_asset];
+		let assets = vec![&usd_asset, &brl_asset, &eur_asset, &ngn_asset, &tzs_asset, &aud_asset, &ars_asset, &pen_asset];
 
 		let result = polygon_api.get_prices(assets.clone()).await;
 		assert!(result.is_ok());
@@ -458,5 +462,23 @@ mod tests {
 		assert_eq!(aud_price.name, aud_asset.symbol);
 		assert_eq!(aud_price.blockchain, Some("FIAT".to_string()));
 		assert!(aud_price.price > 0.into());
+
+		let ars_price = prices
+			.iter()
+			.find(|q| q.symbol == ars_asset.symbol)
+			.expect("Should return a ARS price");
+		assert_eq!(ars_price.symbol, ars_asset.symbol);
+		assert_eq!(ars_price.name, ars_asset.symbol);
+		assert_eq!(ars_price.blockchain, Some("FIAT".to_string()));
+		assert!(ars_price.price > 0.into());
+
+		let pen_price = prices
+			.iter()
+			.find(|q| q.symbol == pen_asset.symbol)
+			.expect("Should return a PEN price");
+		assert_eq!(pen_price.symbol, pen_asset.symbol);
+		assert_eq!(pen_price.name, pen_asset.symbol);
+		assert_eq!(pen_price.blockchain, Some("FIAT".to_string()));
+		assert!(pen_price.price > 0.into());
 	}
 }
