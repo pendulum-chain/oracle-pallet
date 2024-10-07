@@ -402,7 +402,10 @@ mod tests {
 			AssetSpecifier { blockchain: "FIAT".to_string(), symbol: "PEN-USD".to_string() };
 		let usd_asset =
 			AssetSpecifier { blockchain: "FIAT".to_string(), symbol: "USD-USD".to_string() };
-		let assets = vec![&usd_asset, &brl_asset, &eur_asset, &ngn_asset, &tzs_asset, &aud_asset, &ars_asset, &pen_asset];
+		let assets = vec![
+			&usd_asset, &brl_asset, &eur_asset, &ngn_asset, &tzs_asset, &aud_asset, &ars_asset,
+			&pen_asset,
+		];
 
 		let result = polygon_api.get_prices(assets.clone()).await;
 		assert!(result.is_ok());

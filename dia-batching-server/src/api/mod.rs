@@ -8,6 +8,7 @@ use crate::AssetSpecifier;
 use async_trait::async_trait;
 use clap::Parser;
 
+mod binance;
 mod coingecko;
 mod custom;
 mod error;

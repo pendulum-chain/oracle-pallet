@@ -1,45 +1,16 @@
+use crate::api::custom::AssetCompatibility;
 use crate::api::error::CustomError;
-use crate::api::Quotation;
-use crate::AssetSpecifier;
+use crate::types::{AssetSpecifier, Quotation};
 use async_trait::async_trait;
-use chrono::prelude::*;
+use chrono::Utc;
 use graphql_client::{GraphQLQuery, Response};
 use rust_decimal::Decimal;
-use std::string::ToString;
+use rust_decimal::prelude::Zero;
 
-pub struct CustomPriceApi;
-
-impl CustomPriceApi {
-	pub async fn get_price(asset: &AssetSpecifier) -> Result<Quotation, CustomError> {
-		let api =
-			Self::get_supported_api(asset).ok_or(CustomError("Unsupported asset".to_string()))?;
-		api.get_price(asset).await
-	}
-
-	pub fn is_supported(asset: &AssetSpecifier) -> bool {
-		Self::get_supported_api(asset).is_some()
-	}
-
-	/// Iterates over all supported APIs and returns the first one that supports the given asset.
-	fn get_supported_api(asset: &AssetSpecifier) -> Option<Box<dyn AssetCompatibility>> {
-		let compatible_apis: Vec<Box<dyn AssetCompatibility>> = vec![Box::new(AmpePriceView)];
-
-		for api in compatible_apis {
-			if api.supports(asset) {
-				return Some(api);
-			}
-		}
-
-		None
-	}
-}
-
-#[async_trait]
-trait AssetCompatibility: Send {
-	fn supports(&self, asset: &AssetSpecifier) -> bool;
-
-	async fn get_price(&self, asset: &AssetSpecifier) -> Result<Quotation, CustomError>;
-}
+// The blockchain and symbol for the Amplitude native token
+// These are the expected values for the asset specifier.
+const BLOCKCHAIN: &'static str = "Amplitude";
+const SYMBOL: &'static str = "AMPE";
 
 // The paths are relative to the directory where your `Cargo.toml` is located.
 // Both json and the GraphQL schema language are supported as sources for the schema
@@ -54,7 +25,7 @@ pub struct AmpePriceView;
 #[async_trait]
 impl AssetCompatibility for AmpePriceView {
 	fn supports(&self, asset: &AssetSpecifier) -> bool {
-		asset.blockchain.to_uppercase() == "AMPLITUDE" && asset.symbol.to_uppercase() == "AMPE"
+		asset.blockchain.to_uppercase() == BLOCKCHAIN && asset.symbol.to_uppercase() == SYMBOL
 	}
 
 	async fn get_price(&self, _asset: &AssetSpecifier) -> Result<Quotation, CustomError> {
@@ -63,8 +34,6 @@ impl AssetCompatibility for AmpePriceView {
 }
 
 impl AmpePriceView {
-	const SYMBOL: &'static str = "AMPE";
-	const BLOCKCHAIN: &'static str = "Amplitude";
 	const URL: &'static str = "https://squid.subsquid.io/amplitude-squid/graphql";
 
 	/// Response:
@@ -102,11 +71,11 @@ impl AmpePriceView {
 		let price = response_data.bundle_by_id.eth_price;
 
 		Ok(Quotation {
-			symbol: Self::SYMBOL.to_string(),
-			name: Self::SYMBOL.to_string(),
-			blockchain: Some(Self::BLOCKCHAIN.to_string()),
+			symbol: SYMBOL.to_string(),
+			name: SYMBOL.to_string(),
+			blockchain: Some(BLOCKCHAIN.to_string()),
 			price,
-			supply: Decimal::from(0),
+			supply: Decimal::zero(),
 			time: Utc::now().timestamp().unsigned_abs(),
 		})
 	}
@@ -114,7 +83,7 @@ impl AmpePriceView {
 
 #[cfg(test)]
 mod tests {
-	use crate::api::custom::AmpePriceView;
+	use super::{AmpePriceView, BLOCKCHAIN, SYMBOL};
 	use crate::api::custom::CustomPriceApi;
 	use crate::AssetSpecifier;
 
@@ -136,12 +105,9 @@ mod tests {
 	async fn test_get_ampe_price_from_view() {
 		let ampe_quotation = AmpePriceView::get_price().await.expect("should return a quotation");
 
-		assert_eq!(ampe_quotation.symbol, AmpePriceView::SYMBOL);
-		assert_eq!(ampe_quotation.name, AmpePriceView::SYMBOL);
-		assert_eq!(
-			ampe_quotation.blockchain.expect("should return something"),
-			AmpePriceView::BLOCKCHAIN
-		);
+		assert_eq!(ampe_quotation.symbol, SYMBOL);
+		assert_eq!(ampe_quotation.name, SYMBOL);
+		assert_eq!(ampe_quotation.blockchain.expect("should return something"), BLOCKCHAIN);
 		assert!(ampe_quotation.price > 0.into());
 	}
 }

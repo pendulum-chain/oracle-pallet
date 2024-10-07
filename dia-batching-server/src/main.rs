@@ -59,7 +59,8 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 	let port = args.port;
 	println!("Running dia-batching-server on port {port}... (Press CTRL+C to quit)");
 	HttpServer::new(move || {
-		let cors = Cors::default().allowed_origin("https://portal.pendulumchain.org")
+		let cors = Cors::default()
+			.allowed_origin("https://portal.pendulumchain.org")
 			.allowed_methods(vec!["POST"])
 			.allowed_headers(vec!["Content-Type"])
 			.max_age(3600);

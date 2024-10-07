@@ -320,10 +320,9 @@ mod tests {
 
 		// Check if all assets have a quotation and if not, print the missing ones
 		for asset in assets {
-			let quotation = quotations
-				.iter()
-				.find(|q| q.symbol == asset.symbol)
-				.expect(format!("Could not find a quotation for asset specifier {:?}", asset).as_str());
+			let quotation = quotations.iter().find(|q| q.symbol == asset.symbol).expect(
+				format!("Could not find a quotation for asset specifier {:?}", asset).as_str(),
+			);
 			assert_eq!(quotation.symbol, asset.symbol);
 			assert_eq!(quotation.name, asset.symbol);
 			assert_eq!(quotation.blockchain, Some(asset.blockchain.clone()));

@@ -38,3 +38,16 @@ impl fmt::Display for PolygonError {
 		write!(f, "{}", err_msg)
 	}
 }
+
+#[derive(Debug)]
+pub struct BinanceError(pub String);
+
+impl fmt::Display for BinanceError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		let BinanceError(ref err_msg) = *self;
+		// Log the error message
+		log::error!("BinanceError: {}", err_msg);
+		// Write the error message to the formatter
+		write!(f, "{}", err_msg)
+	}
+}
