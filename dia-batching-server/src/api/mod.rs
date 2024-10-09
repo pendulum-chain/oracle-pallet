@@ -44,24 +44,17 @@ impl PriceApi for PriceApiImpl {
 	async fn get_quotations(&self, assets: Vec<&AssetSpecifier>) -> Vec<Quotation> {
 		let mut quotations = Vec::new();
 
-		// Get supported custom assets
-		let custom_assets: Vec<&AssetSpecifier> = assets
-			.clone()
-			.into_iter()
-			.filter(|asset| self.custom_price_api.is_supported(asset))
-			.collect();
+		// Split all assets into custom vs other assets. This is important because it could happen that
+		// a custom asset is also supported by the Polygon or Coingecko API. In this case, we want to
+		// use the custom asset and not the other API.
+		let (custom_assets, assets): (Vec<&AssetSpecifier>, Vec<&AssetSpecifier>) =
+			assets.into_iter().partition(|asset| self.custom_price_api.is_supported(asset));
 
 		let custom_quotes = self.get_custom_quotations(custom_assets.clone()).await;
 		match custom_quotes {
 			Ok(custom_quotes) => quotations.extend(custom_quotes),
 			Err(e) => log::error!("Error getting custom quotations: {}", e),
 		}
-
-		// Remove custom assets from the list of assets. This is important because it could happen that
-		// a custom asset is also supported by the Polygon or Coingecko API. In this case, we want to
-		// use the custom asset and not the other API.
-		let assets: Vec<&AssetSpecifier> =
-			assets.into_iter().filter(|asset| !custom_assets.contains(&asset)).collect();
 
 		let fiat_assets: Vec<_> = assets
 			.clone()
