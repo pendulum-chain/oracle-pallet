@@ -8,6 +8,7 @@ use crate::AssetSpecifier;
 use async_trait::async_trait;
 use clap::Parser;
 
+mod binance;
 mod coingecko;
 mod custom;
 mod error;
@@ -25,6 +26,7 @@ pub trait PriceApi {
 pub struct PriceApiImpl {
 	coingecko_price_api: CoingeckoPriceApi,
 	polygon_price_api: PolygonPriceApi,
+	custom_price_api: CustomPriceApi,
 }
 
 impl PriceApiImpl {
@@ -32,6 +34,7 @@ impl PriceApiImpl {
 		Self {
 			coingecko_price_api: CoingeckoPriceApi::new_from_config(CoingeckoConfig::parse()),
 			polygon_price_api: PolygonPriceApi::new_from_config(PolygonConfig::parse()),
+			custom_price_api: CustomPriceApi::new(),
 		}
 	}
 }
@@ -41,7 +44,18 @@ impl PriceApi for PriceApiImpl {
 	async fn get_quotations(&self, assets: Vec<&AssetSpecifier>) -> Vec<Quotation> {
 		let mut quotations = Vec::new();
 
-		// First, get fiat quotations
+		// Split all assets into custom vs other assets. This is important because it could happen that
+		// a custom asset is also supported by the Polygon or Coingecko API. In this case, we want to
+		// use the custom asset and not the other API.
+		let (custom_assets, assets): (Vec<&AssetSpecifier>, Vec<&AssetSpecifier>) =
+			assets.into_iter().partition(|asset| self.custom_price_api.is_supported(asset));
+
+		let custom_quotes = self.get_custom_quotations(custom_assets.clone()).await;
+		match custom_quotes {
+			Ok(custom_quotes) => quotations.extend(custom_quotes),
+			Err(e) => log::error!("Error getting custom quotations: {}", e),
+		}
+
 		let fiat_assets: Vec<_> = assets
 			.clone()
 			.into_iter()
@@ -54,20 +68,6 @@ impl PriceApi for PriceApiImpl {
 			Err(e) => log::error!("Error getting fiat quotations: {}", e),
 		}
 
-		// Then, get quotations for custom assets
-		let custom_assets: Vec<&AssetSpecifier> = assets
-			.clone()
-			.into_iter()
-			.filter(|asset| CustomPriceApi::is_supported(asset))
-			.collect();
-
-		let custom_quotes = self.get_custom_quotations(custom_assets.clone()).await;
-		match custom_quotes {
-			Ok(custom_quotes) => quotations.extend(custom_quotes),
-			Err(e) => log::error!("Error getting custom quotations: {}", e),
-		}
-
-		// Finally, get supported crypto quotations
 		let crypto_assets = assets
 			.into_iter()
 			.filter(|asset| CoingeckoPriceApi::is_supported(asset))
@@ -106,7 +106,7 @@ impl PriceApiImpl {
 	) -> Result<Vec<Quotation>, CustomError> {
 		let mut quotations = Vec::new();
 		for asset in assets {
-			let quotation = CustomPriceApi::get_price(asset).await?;
+			let quotation = self.custom_price_api.get_price(asset).await?;
 			quotations.push(quotation);
 		}
 		Ok(quotations)
