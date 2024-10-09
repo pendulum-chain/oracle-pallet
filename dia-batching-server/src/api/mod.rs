@@ -26,6 +26,7 @@ pub trait PriceApi {
 pub struct PriceApiImpl {
 	coingecko_price_api: CoingeckoPriceApi,
 	polygon_price_api: PolygonPriceApi,
+	custom_price_api: CustomPriceApi,
 }
 
 impl PriceApiImpl {
@@ -33,6 +34,7 @@ impl PriceApiImpl {
 		Self {
 			coingecko_price_api: CoingeckoPriceApi::new_from_config(CoingeckoConfig::parse()),
 			polygon_price_api: PolygonPriceApi::new_from_config(PolygonConfig::parse()),
+			custom_price_api: CustomPriceApi::new(),
 		}
 	}
 }
@@ -46,7 +48,7 @@ impl PriceApi for PriceApiImpl {
 		let custom_assets: Vec<&AssetSpecifier> = assets
 			.clone()
 			.into_iter()
-			.filter(|asset| CustomPriceApi::is_supported(asset))
+			.filter(|asset| self.custom_price_api.is_supported(asset))
 			.collect();
 
 		let custom_quotes = self.get_custom_quotations(custom_assets.clone()).await;
@@ -111,7 +113,7 @@ impl PriceApiImpl {
 	) -> Result<Vec<Quotation>, CustomError> {
 		let mut quotations = Vec::new();
 		for asset in assets {
-			let quotation = CustomPriceApi::get_price(asset).await?;
+			let quotation = self.custom_price_api.get_price(asset).await?;
 			quotations.push(quotation);
 		}
 		Ok(quotations)

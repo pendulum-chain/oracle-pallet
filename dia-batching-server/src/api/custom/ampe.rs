@@ -4,8 +4,8 @@ use crate::types::{AssetSpecifier, Quotation};
 use async_trait::async_trait;
 use chrono::Utc;
 use graphql_client::{GraphQLQuery, Response};
-use rust_decimal::Decimal;
 use rust_decimal::prelude::Zero;
+use rust_decimal::Decimal;
 
 // The blockchain and symbol for the Amplitude native token
 // These are the expected values for the asset specifier.
@@ -92,8 +92,10 @@ mod tests {
 		let asset =
 			AssetSpecifier { blockchain: "Amplitude".to_string(), symbol: "AMPE".to_string() };
 
-		let ampe_quotation =
-			CustomPriceApi::get_price(&asset).await.expect("should return a quotation");
+		let ampe_quotation = CustomPriceApi::new()
+			.get_price(&asset)
+			.await
+			.expect("should return a quotation");
 
 		assert_eq!(ampe_quotation.symbol, asset.symbol);
 		assert_eq!(ampe_quotation.name, asset.symbol);

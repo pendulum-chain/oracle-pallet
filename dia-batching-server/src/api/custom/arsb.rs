@@ -14,7 +14,9 @@ pub const SYMBOL: &'static str = "ARS-USD";
 
 /// Returns the price for the Argentinian blue dollar.
 /// The price is fetched from Binance as binance has a very accurate price for the blue dollar.
-pub struct ArsBluePriceView;
+pub struct ArsBluePriceView {
+	binance_price_api: BinancePriceApi,
+}
 
 #[async_trait]
 impl AssetCompatibility for ArsBluePriceView {
@@ -23,19 +25,23 @@ impl AssetCompatibility for ArsBluePriceView {
 	}
 
 	async fn get_price(&self, _asset: &AssetSpecifier) -> Result<Quotation, CustomError> {
-		ArsBluePriceView::get_price().await
+		self.get_price().await
 	}
 }
 
 impl ArsBluePriceView {
-	async fn get_price() -> Result<Quotation, CustomError> {
+	pub fn new() -> Self {
+		ArsBluePriceView { binance_price_api: BinancePriceApi::new() }
+	}
+
+	async fn get_price(&self) -> Result<Quotation, CustomError> {
 		// Only the symbol is needed to get the price with the BinancePriceApi client.
 		let asset =
 			AssetSpecifier { blockchain: "Binance".to_string(), symbol: "USDTARS".to_string() };
 
-		let binance_price_api = BinancePriceApi::new();
 		// The direction of the conversion is ARS -> USDT
-		let usdt_ars_price = binance_price_api
+		let usdt_ars_price = self
+			.binance_price_api
 			.get_price(&asset)
 			.await
 			.map_err(|e| CustomError(format!("Failed to get price: {:?}", e)))?
@@ -63,7 +69,7 @@ mod tests {
 	#[tokio::test]
 	async fn test_get_arsb_price_from_view() {
 		let arsb_quotation =
-			ArsBluePriceView::get_price().await.expect("should return a quotation");
+			ArsBluePriceView::new().get_price().await.expect("should return a quotation");
 
 		assert_eq!(arsb_quotation.symbol, SYMBOL);
 		assert_eq!(arsb_quotation.name, SYMBOL);

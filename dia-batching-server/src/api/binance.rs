@@ -31,7 +31,7 @@ impl BinancePriceApi {
 			}),
 			Err(error) => {
 				log::warn!("Error getting price for {:?} from Binance: {:?}", asset, error);
-				Err(BinanceError(format!("Could not get price for {:?}", asset)))
+				Err(error)
 			},
 		}
 	}

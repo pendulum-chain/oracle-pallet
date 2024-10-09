@@ -11,31 +11,35 @@ use ampe::AmpePriceView;
 use arsb::ArsBluePriceView;
 
 #[async_trait]
-pub trait AssetCompatibility: Send {
+pub trait AssetCompatibility: Send + Sync {
 	fn supports(&self, asset: &AssetSpecifier) -> bool;
 
 	async fn get_price(&self, asset: &AssetSpecifier) -> Result<Quotation, CustomError>;
 }
 
-pub struct CustomPriceApi;
+pub struct CustomPriceApi {
+	apis: Vec<Box<dyn AssetCompatibility>>,
+}
 
 impl CustomPriceApi {
-	pub async fn get_price(asset: &AssetSpecifier) -> Result<Quotation, CustomError> {
-		let api =
-			Self::get_supported_api(asset).ok_or(CustomError("Unsupported asset".to_string()))?;
+	pub fn new() -> Self {
+		CustomPriceApi { apis: vec![Box::new(AmpePriceView), Box::new(ArsBluePriceView::new())] }
+	}
+
+	pub async fn get_price(&self, asset: &AssetSpecifier) -> Result<Quotation, CustomError> {
+		let api = self
+			.get_supported_api(asset)
+			.ok_or(CustomError("Unsupported asset".to_string()))?;
 		api.get_price(asset).await
 	}
 
-	pub fn is_supported(asset: &AssetSpecifier) -> bool {
-		Self::get_supported_api(asset).is_some()
+	pub fn is_supported(&self, asset: &AssetSpecifier) -> bool {
+		self.get_supported_api(asset).is_some()
 	}
 
 	/// Iterates over all supported APIs and returns the first one that supports the given asset.
-	fn get_supported_api(asset: &AssetSpecifier) -> Option<Box<dyn AssetCompatibility>> {
-		let compatible_apis: Vec<Box<dyn AssetCompatibility>> =
-			vec![Box::new(AmpePriceView), Box::new(ArsBluePriceView)];
-
-		for api in compatible_apis {
+	fn get_supported_api(&self, asset: &AssetSpecifier) -> Option<&Box<dyn AssetCompatibility>> {
+		for api in &self.apis {
 			if api.supports(asset) {
 				return Some(api);
 			}
