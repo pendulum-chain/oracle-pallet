@@ -25,7 +25,7 @@ pub struct AmpePriceView;
 #[async_trait]
 impl AssetCompatibility for AmpePriceView {
 	fn supports(&self, asset: &AssetSpecifier) -> bool {
-		asset.blockchain.to_uppercase() == BLOCKCHAIN && asset.symbol.to_uppercase() == SYMBOL
+		asset.blockchain.to_uppercase() == BLOCKCHAIN.to_uppercase() && asset.symbol.to_uppercase() == SYMBOL.to_uppercase()
 	}
 
 	async fn get_price(&self, _asset: &AssetSpecifier) -> Result<Quotation, CustomError> {
