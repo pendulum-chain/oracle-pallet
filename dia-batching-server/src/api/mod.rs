@@ -50,10 +50,12 @@ impl PriceApi for PriceApiImpl {
 		let (custom_assets, assets): (Vec<&AssetSpecifier>, Vec<&AssetSpecifier>) =
 			assets.into_iter().partition(|asset| self.custom_price_api.is_supported(asset));
 
-		let custom_quotes = self.get_custom_quotations(custom_assets.clone()).await;
-		match custom_quotes {
-			Ok(custom_quotes) => quotations.extend(custom_quotes),
-			Err(e) => log::error!("Error getting custom quotations: {}", e),
+		let (custom_quotes, custom_quote_errors) =
+			self.get_custom_quotations(custom_assets.clone()).await;
+
+		quotations.extend(custom_quotes);
+		for error in custom_quote_errors {
+			log::error!("Error getting custom quotation: {}", error);
 		}
 
 		let fiat_assets: Vec<_> = assets
@@ -103,12 +105,18 @@ impl PriceApiImpl {
 	async fn get_custom_quotations(
 		&self,
 		assets: Vec<&AssetSpecifier>,
-	) -> Result<Vec<Quotation>, CustomError> {
+	) -> (Vec<Quotation>, Vec<CustomError>) {
 		let mut quotations = Vec::new();
+		let mut errors = Vec::new();
+
 		for asset in assets {
-			let quotation = self.custom_price_api.get_price(asset).await?;
-			quotations.push(quotation);
+			let quotation_result = self.custom_price_api.get_price(asset).await;
+			match quotation_result {
+				Ok(quotation) => quotations.push(quotation),
+				Err(e) => errors.push(e),
+			};
 		}
-		Ok(quotations)
+
+		(quotations, errors)
 	}
 }
