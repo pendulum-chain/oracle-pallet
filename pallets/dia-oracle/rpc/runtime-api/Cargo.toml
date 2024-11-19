@@ -14,22 +14,22 @@ dia-oracle = { version = "0.1.0", default-features = false, path = "../../../dia
 [dependencies.sp-api]
 default-features = false
 git = 'https://github.com/paritytech/polkadot-sdk.git'
-branch = "release-polkadot-v1.1.0"
+branch = "release-polkadot-v1.6.0"
 
 [dependencies.sp-runtime]
 default-features = false
 git = 'https://github.com/paritytech/polkadot-sdk.git'
-branch = "release-polkadot-v1.1.0"
+branch = "release-polkadot-v1.6.0"
 
 [dependencies.frame-support]
 default-features = false
 git = 'https://github.com/paritytech/polkadot-sdk.git'
-branch = "release-polkadot-v1.1.0"
+branch = "release-polkadot-v1.6.0"
 
 [dependencies.sp-std]
 default-features = false
 git = 'https://github.com/paritytech/polkadot-sdk.git'
-branch = "release-polkadot-v1.1.0"
+branch = "release-polkadot-v1.6.0"
 
 [features]
 default = ["std"]
