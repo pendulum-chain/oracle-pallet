@@ -49,6 +49,7 @@ impl system::Config for Test {
 	type SS58Prefix = SS58Prefix;
 	type OnSetCode = ();
 	type MaxConsumers = frame_support::traits::ConstU32<16>;
+	type RuntimeTask = RuntimeTask;
 }
 type Extrinsic = TestXt<RuntimeCall, ()>;
 pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
