@@ -9,3 +9,9 @@ members = [
     'pallets/dia-oracle/rpc/runtime-api',
 ]
 
+# hotfix for https://github.com/paritytech/polkadot-sdk/issues/7653
+[patch.'https://github.com/w3f/fflonk']
+fflonk = { git = "https://www.github.com/w3f/fflonk", rev = "be95d4c971b1d15b5badfc06ff13f5c07987d484" }
+
+[patch.'https://github.com/w3f/ring-proof']
+ring = { git = "https://www.github.com/w3f/ring-proof", rev = "cb7ca32289b20fa9f79d9c00f59da1afc5bc390f" }
