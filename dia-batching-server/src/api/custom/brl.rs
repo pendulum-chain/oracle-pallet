@@ -50,14 +50,20 @@ impl BrlBluePriceView {
 			.map_err(|e| CustomError(format!("Failed to get price: {:?}", e)))?
 			.price;
 
+
+		// Apply the basis point reduction to the price (to the USDT->BRL price, resulting in a favorable buy price for the user)
+		let usdt_brl_price = usdt_brl_price
+			.checked_sub(usdt_brl_price * Decimal::from(BPS_REDUCTION) / Decimal::from(10_000))
+			.unwrap_or(Decimal::zero());
+
 		// We need to convert the price from USD -> BRL though so we invert
 		let brl_usdt_price =
 			Decimal::from(1).checked_div(usdt_brl_price).unwrap_or(Decimal::zero());
 
-		// Apply the basis point reduction to the price
-		let brl_usdt_price = brl_usdt_price
-			.checked_sub(brl_usdt_price * Decimal::from(BPS_REDUCTION) / Decimal::from(10_000))
-			.unwrap_or(Decimal::zero());
+		// // Apply the basis point reduction to the price (to the BRL->USD price, resulting in a favorable sell price for the user)
+		// let brl_usdt_price = brl_usdt_price
+		// 	.checked_sub(brl_usdt_price * Decimal::from(BPS_REDUCTION) / Decimal::from(10_000))
+		// 	.unwrap_or(Decimal::zero());
 
 		Ok(Quotation {
 			symbol: SYMBOL.to_string(),
