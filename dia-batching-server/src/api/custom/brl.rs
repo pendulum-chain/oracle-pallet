@@ -13,7 +13,7 @@ pub const BLOCKCHAIN: &'static str = "FIAT";
 pub const SYMBOL: &'static str = "BRL-USD";
 
 // The basis point reduction for the price. This is used to reduce the price by 6 basis points (0.06%).
-const BPS_REDUCTION: u32 = 6;
+const BPS_REDUCTION: u32 = 12;
 
 /// Returns the price for the Argentinian blue dollar.
 /// The price is fetched from Binance as binance has a very accurate price for the blue dollar.
