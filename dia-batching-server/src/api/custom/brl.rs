@@ -13,7 +13,7 @@ pub const BLOCKCHAIN: &'static str = "FIAT";
 pub const SYMBOL: &'static str = "BRL-USD";
 
 // The basis point reduction for the price. This is used to adjust the price to a more favorable rate for the user.
-const BPS_REDUCTION: u32 = 17;
+const BPS_REDUCTION: u32 = 5;
 
 /// Returns the price for the Argentinian blue dollar.
 /// The price is fetched from Binance as binance has a very accurate price for the blue dollar.
@@ -52,18 +52,18 @@ impl BrlBluePriceView {
 
 
 		// Apply the basis point reduction to the price (to the USDT->BRL price, resulting in a favorable buy price for the user)
-		let usdt_brl_price = usdt_brl_price
-			.checked_sub(usdt_brl_price * Decimal::from(BPS_REDUCTION) / Decimal::from(10_000))
-			.unwrap_or(Decimal::zero());
+		// let usdt_brl_price = usdt_brl_price
+		// 	.checked_sub(usdt_brl_price * Decimal::from(BPS_REDUCTION) / Decimal::from(10_000))
+		// 	.unwrap_or(Decimal::zero());
 
 		// We need to convert the price from USD -> BRL though so we invert
 		let brl_usdt_price =
 			Decimal::from(1).checked_div(usdt_brl_price).unwrap_or(Decimal::zero());
 
-		// // Apply the basis point reduction to the price (to the BRL->USD price, resulting in a favorable sell price for the user)
-		// let brl_usdt_price = brl_usdt_price
-		// 	.checked_sub(brl_usdt_price * Decimal::from(BPS_REDUCTION) / Decimal::from(10_000))
-		// 	.unwrap_or(Decimal::zero());
+		// Apply the basis point reduction to the price (to the BRL->USD price, resulting in a favorable sell price for the user)
+		let brl_usdt_price = brl_usdt_price
+			.checked_sub(brl_usdt_price * Decimal::from(BPS_REDUCTION) / Decimal::from(10_000))
+			.unwrap_or(Decimal::zero());
 
 		Ok(Quotation {
 			symbol: SYMBOL.to_string(),
