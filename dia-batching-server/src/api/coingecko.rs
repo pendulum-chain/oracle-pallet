@@ -60,13 +60,20 @@ impl CoingeckoPriceApi {
 
 				let supply = price.usd_24h_vol.unwrap_or_default();
 
+				// Get current timestamp for PEN as CoinGecko does not update it frequently
+				let time = if asset.symbol == "PEN" {
+					chrono::Utc::now().timestamp().unsigned_abs()
+				} else {
+					price.last_updated_at
+				};
+
 				Some(Quotation {
 					symbol: asset.symbol.clone(),
 					name: asset.symbol.clone(),
 					blockchain: Some(asset.blockchain.clone()),
 					price: price.usd,
 					supply,
-					time: price.last_updated_at,
+					time
 				})
 			})
 			.collect();
@@ -327,6 +334,35 @@ mod tests {
 			assert_eq!(quotation.name, asset.symbol);
 			assert_eq!(quotation.blockchain, Some(asset.blockchain.clone()));
 			assert!(quotation.price > 0.into());
+		}
+	}
+
+	#[tokio::test]
+	async fn test_pen_price_has_current_timestamp() {
+		let (api_key, host_url) = get_coingecko_variables();
+
+		let price_api = CoingeckoPriceApi::new(host_url, api_key);
+
+		let pen_asset =
+			AssetSpecifier { blockchain: "Pendulum".to_string(), symbol: "PEN".to_string() };
+
+		let assets = vec![&pen_asset];
+
+		let quotations = price_api.get_prices(assets.clone()).await;
+		assert!(quotations.is_ok());
+		let quotations = quotations.unwrap();
+
+		// Check if all assets have a quotation and if not, print the missing ones
+		for asset in assets {
+			let quotation = quotations.iter().find(|q| q.symbol == asset.symbol).expect(
+				format!("Could not find a quotation for asset specifier {:?}", asset).as_str(),
+			);
+			assert_eq!(quotation.symbol, asset.symbol);
+			assert_eq!(quotation.name, asset.symbol);
+			assert_eq!(quotation.blockchain, Some(asset.blockchain.clone()));
+			assert!(quotation.price > 0.into());
+			// not older than 10 minutes
+			assert!(quotation.time > (chrono::Utc::now().timestamp().unsigned_abs() - 10 * 60));
 		}
 	}
 }
