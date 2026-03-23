@@ -40,17 +40,9 @@ where
 	T: PriceApi + Send + Sync + 'static,
 {
 	let coins = Arc::clone(&storage);
-	let _ = tokio::spawn(async move {
-		loop {
-			let time_elapsed = std::time::Instant::now();
+	let coins = Arc::clone(&coins);
 
-			let coins = Arc::clone(&coins);
-
-			update_prices(coins, &supported_currencies, &api).await;
-
-			tokio::time::sleep(update_interval.saturating_sub(time_elapsed.elapsed())).await;
-		}
-	});
+	update_prices(coins, &supported_currencies, &api).await;
 
 	Ok(())
 }
