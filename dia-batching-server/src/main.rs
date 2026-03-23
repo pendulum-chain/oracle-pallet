@@ -22,6 +22,7 @@ mod types;
 #[actix_web::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 	pretty_env_logger::init();
+	dotenv::dotenv().ok();
 
 	let args: DiaApiArgs = DiaApiArgs::parse();
 	let storage = Arc::new(CoinInfoStorage::default());

@@ -51,3 +51,16 @@ impl fmt::Display for BinanceError {
 		write!(f, "{}", err_msg)
 	}
 }
+
+#[derive(Debug)]
+pub struct CoinbaseError(pub String);
+
+impl fmt::Display for CoinbaseError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		let CoinbaseError(ref err_msg) = *self;
+		// Log the error message
+		log::error!("CoinbaseError: {}", err_msg);
+		// Write the error message to the formatter
+		write!(f, "{}", err_msg)
+	}
+}

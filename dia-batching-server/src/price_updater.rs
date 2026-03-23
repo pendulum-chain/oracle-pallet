@@ -2,12 +2,33 @@ use crate::api::PriceApi;
 use crate::storage::CoinInfoStorage;
 use crate::types::{CoinInfo, Quotation};
 use crate::AssetSpecifier;
-use log::{error, info};
+use alloy::{
+    primitives::{Uint, Address, U256},
+    providers::ProviderBuilder,
+	network::EthereumWallet,
+    signers::local::PrivateKeySigner,
+    sol,
+};
+use reqwest::Url;
+use log::{error, info, warn};
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use std::collections::HashSet;
+use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
-use std::{error::Error, sync::Arc};
+use std::str::FromStr;
+use std::sync::Arc;
+use std::{error::Error};
+
+type U48 = Uint<48, 1>;
+type U56 = Uint<56, 1>;
+
+sol! {
+    #[sol(rpc)]
+    contract DarkOracle {
+        function updatePriceFeeds(uint48[5] _prices, uint56 _timestamp) external returns (bool success_);
+    }
+}
 
 pub async fn run_update_prices_loop<T>(
 	storage: Arc<CoinInfoStorage>,
@@ -71,8 +92,89 @@ async fn update_prices<T>(
 			Err(e) => error!("Error converting to CoinInfo: {:#?}", e),
 		});
 
-	coins.replace_currencies_by_symbols(currencies);
+	coins.replace_currencies_by_symbols(currencies.clone());
 	info!("Currencies Updated");
+
+	// Update contract prices
+	if let Err(e) = update_contract_prices(&currencies).await {
+		error!("Failed to update contract prices: {:?}", e);
+	}
+}
+
+async fn update_contract_prices(currencies: &Vec<CoinInfo>) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
+	warn!("Starting contract price update...");
+	let private_key_str = std::env::var("PRIVATE_KEY").map_err(|_| "PRIVATE_KEY not set")?;
+	let contract_address = std::env::var("CONTRACT_ADDRESS").map_err(|_| "CONTRACT_ADDRESS not set")?;
+	let rpc_url = std::env::var("RPC_URL").map_err(|_| "RPC_URL not set")?;
+
+	warn!("Connecting to Ethereum provider at {}", rpc_url);
+	warn!("Using contract address: {}", contract_address);
+	
+	let signer = PrivateKeySigner::from_str(&private_key_str)?;
+	let wallet_address = signer.address();
+	warn!("Using wallet address (public key): {}", wallet_address);
+	
+	let wallet = EthereumWallet::from(signer);
+
+	let provider = ProviderBuilder::new()
+		.with_recommended_fillers()
+		.wallet(wallet)
+		.on_http(Url::parse(&rpc_url).expect("Invalid RPC_URL"));
+
+	let addr = contract_address.parse::<Address>()?;
+	let oracle = DarkOracle::new(addr, provider);
+
+	let symbol_to_price: std::collections::HashMap<&str, u128> = currencies.iter().map(|c| (c.symbol.as_str(), c.price)).collect();
+
+	let mut prices: [u64; 5] = [0; 5];
+
+	// ETH index 0
+	if let Some(eth_price) = symbol_to_price.get("ETH") {
+		prices[0] = u64::try_from(*eth_price)?;
+	}
+
+	// BTC index 1
+	if let Some(btc_price) = symbol_to_price.get("BTC") {
+		prices[1] = u64::try_from(*btc_price)?;
+	}
+
+	// USDC index 2
+	if let Some(usdc_price) = symbol_to_price.get("USDC") {
+		prices[2] = u64::try_from(*usdc_price)?;
+	}
+
+	// EURC index 3
+	if let Some(eurc_price) = symbol_to_price.get("EURC") {
+		prices[3] = u64::try_from(*eurc_price)?;
+	}
+
+	// BRL index 4
+	if let Some(brl_price) = symbol_to_price.get("BRL") {
+		prices[4] = u64::try_from(*brl_price)?;
+	}
+
+	let timestamp = u64::try_from(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_millis())?;
+
+	// log prices
+	info!("Updating contract prices: {:?}", prices);
+	info!("Timestamp: {:?}", timestamp);
+	
+	// Set explicit gas limit to maximum (30M) for isolation testing
+	let call = oracle.updatePriceFeeds(prices, timestamp).gas(10_000_000);
+	warn!("Sending transaction with gas limit: 10,000,000");
+	let tx = call.send().await?;
+	warn!("Transaction sent, waiting for receipt...");
+	let receipt = tx.get_receipt().await?;
+
+
+	if receipt.status() {
+		info!("Contract prices updated successfully - Transaction succeeded");
+	} else {
+		warn!("Contract prices update failed - Transaction reverted");
+		return Err("Transaction reverted".into());
+	}
+
+	Ok(())
 }
 
 #[derive(Debug)]
@@ -91,10 +193,10 @@ impl Display for ConvertingError {
 impl Error for ConvertingError {}
 
 fn convert_decimal_to_u128(input: &Decimal) -> Result<u128, ConvertingError> {
-	let fract = (input.fract() * Decimal::from(1_000_000_000_000_u128))
+	let fract = (input.fract() * Decimal::from(1_000_000_000_000_000_000_u128))
 		.to_u128()
 		.ok_or(ConvertingError::DecimalTooLarge)?;
-	let trunc = (input.trunc() * Decimal::from(1_000_000_000_000_u128))
+	let trunc = (input.trunc() * Decimal::from(1_000_000_000_000_000_000_u128))
 		.to_u128()
 		.ok_or(ConvertingError::DecimalTooLarge)?;
 
@@ -222,7 +324,7 @@ mod tests {
 
 		assert_eq!(4, c.len());
 
-		assert_eq!(c[1].price, 1000000000000);
+		assert_eq!(c[1].price, 1000000000000000000);
 
 		assert_eq!(c[1].name, "ETH");
 	}
@@ -248,7 +350,7 @@ mod tests {
 
 		assert_eq!(2, c.len());
 
-		assert_eq!(c[1].price, 53712327000);
+		assert_eq!(c[1].price, 53712327000000000);
 
 		assert_eq!(c[1].name, "MXNUSD=X");
 	}
@@ -272,7 +374,7 @@ mod tests {
 
 		assert_eq!(1, c.len());
 
-		assert_eq!(c[0].price, 1000000000000);
+		assert_eq!(c[0].price, 1000000000000000000);
 
 		assert_eq!(c[0].name, "USD-X");
 	}
@@ -312,7 +414,7 @@ mod tests {
 
 		assert_eq!(1, c.len());
 
-		assert_eq!(c[0].price, 1000000000000);
+		assert_eq!(c[0].price, 1000000000000000000);
 
 		assert_eq!(c[0].name, "BTC");
 	}
@@ -366,14 +468,14 @@ mod tests {
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(supported_currencies);
 
-		assert_eq!(c[0].price, 1000000000000);
-		assert_eq!(c[0].supply, 1000000000000);
+		assert_eq!(c[0].price, 1000000000000000000);
+		assert_eq!(c[0].supply, 1000000000000000000);
 
-		assert_eq!(c[1].price, 123456789123456789012);
-		assert_eq!(c[1].supply, 1000000000000);
+		assert_eq!(c[1].price, 123456789123456789012345000000);
+		assert_eq!(c[1].supply, 1000000000000000000);
 
-		assert_eq!(c[2].price, 1000000000001);
-		assert_eq!(c[2].supply, 1000000000000);
+		assert_eq!(c[2].price, 1000000000001000000);
+		assert_eq!(c[2].supply, 1000000000000000000);
 
 		assert_eq!(c[0].name, "BTC");
 		assert_eq!(c[1].name, "USDC");

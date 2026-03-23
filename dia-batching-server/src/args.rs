@@ -16,7 +16,7 @@ pub struct SupportedCurrencies(pub Vec<String>);
 #[clap(name = "dia-batching-server")]
 pub struct DiaApiArgs {
 	/// Iteration duration after one batch of requests
-	#[clap(short, long, env = "UPDATE_INTERVAL_SECONDS", default_value = "10")]
+	#[clap(short, long, env = "UPDATE_INTERVAL_SECONDS", default_value = "100")]
 	pub update_interval_seconds: u64,
 
 	/// Currencies to support
@@ -25,7 +25,7 @@ pub struct DiaApiArgs {
 	#[clap(short, long,
         parse(from_str = parse_currency_vec),
 		env = "SUPPORTED_CURRENCIES",
-        default_value = "FIAT:USD-USD,FIAT:EUR-USD,FIAT:BRL-USD,FIAT:AUD-USD,FIAT:NGN-USD,FIAT:TZS-USD,FIAT:PEN-USD,FIAT:ARS-USD,Pendulum:PEN,Amplitude:AMPE,Polkadot:DOT,Kusama:KSM,Astar:ASTR,Bifrost:BNC,Bifrost:vDOT,HydraDX:HDX,Moonbeam:GLMR,Polkadex:PDEX,Stellar:XLM,Picasso:PICA"
+        default_value = "Base:EURC,Base:USDC,Base:BRL"
     )]
 	pub supported_currencies: SupportedCurrencies,
 
