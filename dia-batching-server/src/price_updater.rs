@@ -135,15 +135,17 @@ async fn update_contract_prices(currencies: &Vec<CoinInfo>) -> Result<(), Box<dy
 		prices[2] = u64::try_from(*usdc_price)?;
 	}
 
-	// EURC index 3
-	if let Some(eurc_price) = symbol_to_price.get("EURC") {
-		prices[3] = u64::try_from(*eurc_price)?;
+	// BRL index 3
+	if let Some(brl_price) = symbol_to_price.get("BRL") {
+		prices[3] = u64::try_from(*brl_price)?;
 	}
 
-	// BRL index 4
-	if let Some(brl_price) = symbol_to_price.get("BRL") {
-		prices[4] = u64::try_from(*brl_price)?;
+	// EURC index 4
+	if let Some(eurc_price) = symbol_to_price.get("EURC") {
+		prices[4] = u64::try_from(*eurc_price)?;
 	}
+
+	
 
 	let timestamp = u64::try_from(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_millis())?;
 
