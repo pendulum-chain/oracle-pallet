@@ -122,27 +122,27 @@ async fn update_contract_prices(currencies: &Vec<CoinInfo>) -> Result<(), Box<dy
 
 	// ETH index 0
 	if let Some(eth_price) = symbol_to_price.get("ETH") {
-		prices[0] = u64::try_from(*eth_price)?;
+		prices[0] = u64::try_from(*eth_price / 10_000_000_000)?;
 	}
 
 	// BTC index 1
 	if let Some(btc_price) = symbol_to_price.get("BTC") {
-		prices[1] = u64::try_from(*btc_price)?;
+		prices[1] = u64::try_from(*btc_price / 10_000_000_000)?;
 	}
 
 	// USDC index 2
 	if let Some(usdc_price) = symbol_to_price.get("USDC") {
-		prices[2] = u64::try_from(*usdc_price)?;
+		prices[2] = u64::try_from(*usdc_price / 10_000_000_000)?;
 	}
 
 	// BRL index 3
 	if let Some(brl_price) = symbol_to_price.get("BRL") {
-		prices[3] = u64::try_from(*brl_price)?;
+		prices[3] = u64::try_from(*brl_price / 10_000_000_000)?;
 	}
 
 	// EURC index 4
 	if let Some(eurc_price) = symbol_to_price.get("EURC") {
-		prices[4] = u64::try_from(*eurc_price)?;
+		prices[4] = u64::try_from(*eurc_price / 10_000_000_000)?;
 	}
 
 	
