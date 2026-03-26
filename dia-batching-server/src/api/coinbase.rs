@@ -5,6 +5,7 @@ use crate::api::error::CoinbaseError;
 use crate::api::Quotation;
 use crate::AssetSpecifier;
 
+#[derive(Clone)]
 pub struct CoinbasePriceApi {
 	client: CoinbaseClient,
 }
@@ -91,6 +92,7 @@ struct CoinbasePriceData {
 }
 
 /// Coinbase network client
+#[derive(Clone)]
 pub struct CoinbaseClient {
 	host: String,
 }
