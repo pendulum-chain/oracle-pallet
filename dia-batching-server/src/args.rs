@@ -19,6 +19,10 @@ pub struct DiaApiArgs {
 	#[clap(short, long, env = "UPDATE_INTERVAL_SECONDS", default_value = "100")]
 	pub update_interval_seconds: u64,
 
+	/// How often (in seconds) to update Pyth price feeds on-chain
+	#[clap(long, env = "PYTH_UPDATE_INTERVAL_SECONDS", default_value = "300")]
+	pub pyth_update_interval_seconds: u64,
+
 	/// Currencies to support
 	/// Each currency needs to have the format <blockchain>:<symbol>
 	/// Fiat currencies need to have the format FIAT:<from>-<to>

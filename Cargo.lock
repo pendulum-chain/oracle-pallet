@@ -2335,6 +2335,7 @@ dependencies = [
  "dotenv",
  "futures",
  "graphql_client",
+ "hex",
  "log",
  "pretty_env_logger",
  "reqwest 0.12.22",

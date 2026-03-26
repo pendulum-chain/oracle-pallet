@@ -54,6 +54,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 		storage,
 		supported_currencies,
 		std::time::Duration::from_secs(args.update_interval_seconds),
+		std::time::Duration::from_secs(args.pyth_update_interval_seconds),
 		price_api,
 	)
 	.await?;
