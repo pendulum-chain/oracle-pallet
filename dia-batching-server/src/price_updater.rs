@@ -174,10 +174,15 @@ where
 	info!("Initialized nonce manager with nonce: {}", initial_nonce);
 
 	loop {
+		let start = tokio::time::Instant::now();
 		let coins = Arc::clone(&storage);
 		update_prices(coins, &supported_currencies, &api, &mut pyth_updater, &nonce_manager).await;
-
-		tokio::time::sleep(update_interval).await;
+		let elapsed = start.elapsed();
+		let target_duration = std::time::Duration::from_secs(2);
+		if elapsed < target_duration {
+			let sleep_duration = target_duration - elapsed;
+			tokio::time::sleep(sleep_duration).await;
+		}
 	}
 }
 

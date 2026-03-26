@@ -16,7 +16,7 @@ pub struct SupportedCurrencies(pub Vec<String>);
 #[clap(name = "dia-batching-server")]
 pub struct DiaApiArgs {
 	/// Iteration duration after one batch of requests
-	#[clap(short, long, env = "UPDATE_INTERVAL_SECONDS", default_value = "100")]
+	#[clap(short, long, env = "UPDATE_INTERVAL_SECONDS", default_value = "2")]
 	pub update_interval_seconds: u64,
 
 	/// How often (in seconds) to update Pyth price feeds on-chain
