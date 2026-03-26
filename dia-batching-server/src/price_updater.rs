@@ -4,7 +4,7 @@ use crate::types::{CoinInfo, Quotation};
 use crate::AssetSpecifier;
 use alloy::{
 	primitives::{Address, Bytes, Uint, U256},
-	providers::ProviderBuilder,
+	providers::{ProviderBuilder, Provider},
 	network::EthereumWallet,
 	signers::local::PrivateKeySigner,
 	sol,
@@ -18,11 +18,30 @@ use std::collections::HashSet;
 use std::convert::TryFrom;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::{error::Error};
 
 type U48 = Uint<48, 1>;
 type U56 = Uint<56, 1>;
+
+struct NonceManager {
+    nonce: Mutex<u64>,
+}
+
+impl NonceManager {
+    fn new(initial_nonce: u64) -> Self {
+        Self {
+            nonce: Mutex::new(initial_nonce),
+        }
+    }
+
+    fn next_nonce(&self) -> u64 {
+        let mut nonce = self.nonce.lock().unwrap();
+        let current = *nonce;
+        *nonce += 1;
+        current
+    }
+}
 
 // ── Pyth Hermes API types ─────────────────────────────────────────────────────
 
@@ -87,6 +106,7 @@ impl PythPriceUpdater {
 
 	async fn run_update_pyth_prices(
 		&mut self,
+		nonce_manager: Arc<NonceManager>,
 	) -> Result<Vec<HermesParsedEntry>, Box<dyn Error + Send + Sync + 'static>> {
 		let should_update_contract = match self.last_update {
 			None => true,
@@ -116,7 +136,7 @@ impl PythPriceUpdater {
 		if should_update_contract {
 			let update_data: Vec<String> =
 				data.binary.data.iter().map(|hex| format!("0x{}", hex)).collect();
-			if let Err(e) = update_pyth_contract_prices(&update_data).await {
+			if let Err(e) = update_pyth_contract_prices(&update_data, nonce_manager.clone()).await {
 				error!("Failed to update Pyth contract prices: {:?}", e);
 			} else {
 				info!("Pyth prices updated on-chain ✓");
@@ -142,9 +162,20 @@ where
 {
 	let mut pyth_updater = PythPriceUpdater::new(pyth_update_interval);
 
+	// Initialize nonce manager
+	let private_key_str = std::env::var("PRIVATE_KEY").map_err(|_| "PRIVATE_KEY not set")?;
+	let rpc_url = std::env::var("RPC_URL").map_err(|_| "RPC_URL not set")?;
+	let signer = PrivateKeySigner::from_str(&private_key_str)?;
+	let wallet_address = signer.address();
+	let temp_provider = ProviderBuilder::new()
+		.on_http(Url::parse(&rpc_url).expect("Invalid RPC_URL"));
+	let initial_nonce = temp_provider.get_transaction_count(wallet_address).await?;
+	let nonce_manager = Arc::new(NonceManager::new(initial_nonce));
+	info!("Initialized nonce manager with nonce: {}", initial_nonce);
+
 	loop {
 		let coins = Arc::clone(&storage);
-		update_prices(coins, &supported_currencies, &api, &mut pyth_updater).await;
+		update_prices(coins, &supported_currencies, &api, &mut pyth_updater, &nonce_manager).await;
 
 		tokio::time::sleep(update_interval).await;
 	}
@@ -170,6 +201,7 @@ fn convert_to_coin_info(value: Quotation) -> Result<CoinInfo, Box<dyn Error + Sy
 
 async fn update_pyth_contract_prices(
 	update_data: &[String],
+	nonce_manager: Arc<NonceManager>,
 ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
 	let private_key_str = std::env::var("PRIVATE_KEY").map_err(|_| "PRIVATE_KEY not set")?;
 	let pyth_adapter_address = std::env::var("PYTH_ADAPTER_ADDRESS")
@@ -206,11 +238,19 @@ async fn update_pyth_contract_prices(
 		pyth_adapter.getUpdateFee(bytes_data.clone()).call().await?.updateFee_;
 	info!("Pyth update fee: {} wei", update_fee);
 
+	// Estimate and set higher priority fee
+	let fees = provider.estimate_eip1559_fees(None).await?;
+	let priority_fee = fees.max_priority_fee_per_gas * (3u128 / 2u128);
+	info!("Pyth priority fee: {} wei", priority_fee);
+
 	// Send the update transaction
+	let nonce = nonce_manager.next_nonce();
 	let call = pyth_adapter
 		.updatePriceFeeds(bytes_data)
 		.value(update_fee)
-		.gas(10_000_000);
+		.gas(10_000_000)
+		.max_priority_fee_per_gas(priority_fee)
+		.nonce(nonce);
 	let tx = call.send().await?;
 
 	warn!("Pyth updatePriceFeeds tx sent");
@@ -232,6 +272,7 @@ async fn update_prices<T>(
 	supported_currencies: &HashSet<AssetSpecifier>,
 	api: &T,
 	pyth_updater: &mut PythPriceUpdater,
+	nonce_manager: &Arc<NonceManager>,
 ) where
 	T: PriceApi + Send + Sync + 'static,
 {
@@ -251,8 +292,8 @@ async fn update_prices<T>(
 	info!("Currencies Updated");
 
 
-	let dark_oracle_fut = update_dark_oracle_contract_prices(&currencies);
-	let pyth_fut = pyth_updater.run_update_pyth_prices();
+	let dark_oracle_fut = update_dark_oracle_contract_prices(&currencies, nonce_manager.clone());
+	let pyth_fut = pyth_updater.run_update_pyth_prices(nonce_manager.clone());
 
 	let (dark_oracle_result, pyth_result) = tokio::join!(dark_oracle_fut, pyth_fut);
 
@@ -266,6 +307,7 @@ async fn update_prices<T>(
 
 async fn update_dark_oracle_contract_prices(
 	currencies: &Vec<CoinInfo>,
+	nonce_manager: Arc<NonceManager>,
 ) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
 	warn!("Starting contract price update...");
 	let private_key_str = std::env::var("PRIVATE_KEY").map_err(|_| "PRIVATE_KEY not set")?;
@@ -288,7 +330,7 @@ async fn update_dark_oracle_contract_prices(
 		.on_http(Url::parse(&rpc_url).expect("Invalid RPC_URL"));
 
 	let addr = contract_address.parse::<Address>()?;
-	let oracle = DarkOracle::new(addr, provider);
+	let oracle = DarkOracle::new(addr, provider.clone());
 
 	let symbol_to_price: std::collections::HashMap<&str, u128> =
 		currencies.iter().map(|c| (c.symbol.as_str(), c.price)).collect();
@@ -329,7 +371,13 @@ async fn update_dark_oracle_contract_prices(
 	info!("Updating contract prices: {:?}", prices);
 	info!("Timestamp: {:?}", timestamp);
 
-	let call = oracle.updatePriceFeeds(prices, timestamp).gas(10_000_000);
+	// Estimate and set higher priority fee
+	let fees = provider.estimate_eip1559_fees(None).await?;
+	let priority_fee = fees.max_priority_fee_per_gas * (3u128 / 2u128);
+	info!("DarkOracle priority fee: {} wei", priority_fee);
+
+	let nonce = nonce_manager.next_nonce();
+	let call = oracle.updatePriceFeeds(prices, timestamp).gas(10_000_000).max_priority_fee_per_gas(priority_fee).nonce(nonce);
 	warn!("Sending transaction with gas limit: 10,000,000");
 	let tx = call.send().await?;
 	warn!("Transaction sent");
@@ -480,7 +528,8 @@ mod tests {
 		}
 
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater).await;
+		let nonce_manager = Arc::new(NonceManager::new(0));
+		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(supported_currencies);
 
@@ -504,7 +553,8 @@ mod tests {
 			.insert(AssetSpecifier { blockchain: "FIAT".into(), symbol: "MXN-USD".into() });
 
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater).await;
+		let nonce_manager = Arc::new(NonceManager::new(0));
+		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![
 			AssetSpecifier { blockchain: "Bitcoin".into(), symbol: "BTC".into() },
@@ -529,7 +579,8 @@ mod tests {
 			.insert(AssetSpecifier { blockchain: "FIAT".into(), symbol: "USD-USD".into() });
 
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater).await;
+		let nonce_manager = Arc::new(NonceManager::new(0));
+		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![AssetSpecifier {
 			blockchain: "FIAT".into(),
@@ -550,7 +601,8 @@ mod tests {
 		let coins = Arc::clone(&storage);
 		let all_currencies = HashSet::default();
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater).await;
+		let nonce_manager = Arc::new(NonceManager::new(0));
+		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![
 			AssetSpecifier { blockchain: "Bitcoin".into(), symbol: "BTCCash".into() },
@@ -574,7 +626,8 @@ mod tests {
 			all_currencies.insert(currency);
 		}
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater).await;
+		let nonce_manager = Arc::new(NonceManager::new(0));
+		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(supported_currencies);
 
@@ -592,7 +645,8 @@ mod tests {
 		let coins = Arc::clone(&storage);
 		let all_currencies = HashSet::default();
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater).await;
+		let nonce_manager = Arc::new(NonceManager::new(0));
+		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![]);
 
@@ -607,7 +661,8 @@ mod tests {
 		let all_currencies = HashSet::default();
 
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater).await;
+		let nonce_manager = Arc::new(NonceManager::new(0));
+		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![AssetSpecifier {
 			blockchain: "Bitcoin".into(),
@@ -633,7 +688,8 @@ mod tests {
 		}
 
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater).await;
+		let nonce_manager = Arc::new(NonceManager::new(0));
+		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(supported_currencies);
 
