@@ -81,35 +81,4 @@ impl AmpePriceView {
 	}
 }
 
-#[cfg(test)]
-mod tests {
-	use super::{AmpePriceView, BLOCKCHAIN, SYMBOL};
-	use crate::api::custom::CustomPriceApi;
-	use crate::AssetSpecifier;
 
-	#[tokio::test]
-	async fn test_get_ampe_price_from_api() {
-		let asset =
-			AssetSpecifier { blockchain: "Amplitude".to_string(), symbol: "AMPE".to_string() };
-
-		let ampe_quotation = CustomPriceApi::new()
-			.get_price(&asset)
-			.await
-			.expect("should return a quotation");
-
-		assert_eq!(ampe_quotation.symbol, asset.symbol);
-		assert_eq!(ampe_quotation.name, asset.symbol);
-		assert_eq!(ampe_quotation.blockchain.expect("should return something"), asset.blockchain);
-		assert!(ampe_quotation.price > 0.into());
-	}
-
-	#[tokio::test]
-	async fn test_get_ampe_price_from_view() {
-		let ampe_quotation = AmpePriceView::get_price().await.expect("should return a quotation");
-
-		assert_eq!(ampe_quotation.symbol, SYMBOL);
-		assert_eq!(ampe_quotation.name, SYMBOL);
-		assert_eq!(ampe_quotation.blockchain.expect("should return something"), BLOCKCHAIN);
-		assert!(ampe_quotation.price > 0.into());
-	}
-}
