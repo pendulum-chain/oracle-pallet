@@ -60,20 +60,20 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 	)
 	.await?;
 
-	// let port = args.port;
-	// println!("Running dia-batching-server on port {port}... (Press CTRL+C to quit)");
-	// HttpServer::new(move || {
-	// 	let cors = Cors::default()
-	// 		.allowed_origin("https://portal.pendulumchain.org")
-	// 		.allowed_methods(vec!["POST"])
-	// 		.allowed_headers(vec!["Content-Type"])
-	// 		.max_age(3600);
-	// 	App::new().app_data(data.clone()).wrap(cors).service(currencies_post)
-	// })
-	// .on_connect(|_, _| println!("Serving Request"))
-	// .bind(format!("0.0.0.0:{port}"))?
-	// .run()
-	// .await?;
+	let port = args.port;
+	println!("Running dia-batching-server on port {port}... (Press CTRL+C to quit)");
+	HttpServer::new(move || {
+		let cors = Cors::default()
+			.allowed_origin("https://portal.pendulumchain.org")
+			.allowed_methods(vec!["POST"])
+			.allowed_headers(vec!["Content-Type"])
+			.max_age(3600);
+		App::new().app_data(data.clone()).wrap(cors).service(currencies_post)
+	})
+	.on_connect(|_, _| println!("Serving Request"))
+	.bind(format!("0.0.0.0:{port}"))?
+	.run()
+	.await?;
 
 	Ok(())
 }
