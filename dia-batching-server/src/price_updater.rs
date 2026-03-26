@@ -24,6 +24,8 @@ use std::{error::Error};
 type U48 = Uint<48, 1>;
 type U56 = Uint<56, 1>;
 
+const BIPS_DIVISOR: u64 = 10000;
+
 struct NonceManager {
     nonce: Mutex<u64>,
 }
@@ -76,6 +78,12 @@ struct HermesResponse {
 	parsed: Vec<HermesParsedEntry>,
 }
 
+#[derive(Debug)]
+pub struct PriceData {
+	pub usdc: f64,
+	pub eurc: f64,
+}
+
 // ── Solidity contracts ────────────────────────────────────────────────────────
 
 sol! {
@@ -107,7 +115,7 @@ impl PythPriceUpdater {
 	async fn run_update_pyth_prices(
 		&mut self,
 		nonce_manager: Arc<NonceManager>,
-	) -> Result<Vec<HermesParsedEntry>, Box<dyn Error + Send + Sync + 'static>> {
+	) -> Result<PriceData, Box<dyn Error + Send + Sync + 'static>> {
 		let should_update_contract = match self.last_update {
 			None => true,
 			Some(t) => t.elapsed() >= self.update_interval,
@@ -118,20 +126,28 @@ impl PythPriceUpdater {
 			USDC_PRICE_FEED_ID, EURC_PRICE_FEED_ID
 		);
 
-		info!("Fetching Pyth prices from Hermes API...");
+		debug!("Fetching Pyth prices from Hermes API...");
 		let response = reqwest::get(&api_url).await?;
 		if !response.status().is_success() {
 			return Err(format!("Hermes API request failed: {}", response.status()).into());
 		}
 
 		let data: HermesResponse = response.json().await?;
-		info!("Pyth prices fetched: {} entries", data.parsed.len());
+
+
+		let mut usdc_price = None;
+		let mut eurc_price = None;
 		for entry in &data.parsed {
-			info!(
-				"  id={} price={} expo={} publish_time={}",
-				entry.id, entry.price.price, entry.price.expo, entry.price.publish_time
-			);
+			let price_val = entry.price.price.parse::<f64>().map_err(|e| format!("Failed to parse price: {}", e))?;
+			let actual_price = price_val * 10f64.powi(entry.price.expo);
+			if entry.id == USDC_PRICE_FEED_ID {
+				usdc_price = Some(actual_price);
+			} else if entry.id == EURC_PRICE_FEED_ID {
+				eurc_price = Some(actual_price);
+			}
 		}
+		let usdc = usdc_price.ok_or("USDC price not found")?;
+		let eurc = eurc_price.ok_or("EURC price not found")?;
 
 		if should_update_contract {
 			let update_data: Vec<String> =
@@ -144,7 +160,7 @@ impl PythPriceUpdater {
 			}
 		}
 
-		Ok(data.parsed)
+		Ok(PriceData { usdc, eurc })
 	}
 }
 
@@ -155,6 +171,7 @@ pub async fn run_update_prices_loop<T>(
 	supported_currencies: HashSet<AssetSpecifier>,
 	update_interval: std::time::Duration,
 	pyth_update_interval: std::time::Duration,
+	divergence_threshold_bp: u64,
 	api: T,
 ) -> Result<(), Box<dyn Error + Send + Sync + 'static>>
 where
@@ -176,7 +193,7 @@ where
 	loop {
 		let start = tokio::time::Instant::now();
 		let coins = Arc::clone(&storage);
-		update_prices(coins, &supported_currencies, &api, &mut pyth_updater, &nonce_manager).await;
+		update_prices(coins, &supported_currencies, &api, &mut pyth_updater, &nonce_manager, divergence_threshold_bp).await;
 		let elapsed = start.elapsed();
 		let target_duration = std::time::Duration::from_secs(2);
 		if elapsed < target_duration {
@@ -278,6 +295,7 @@ async fn update_prices<T>(
 	api: &T,
 	pyth_updater: &mut PythPriceUpdater,
 	nonce_manager: &Arc<NonceManager>,
+	divergence_threshold_bp: u64,
 ) where
 	T: PriceApi + Send + Sync + 'static,
 {
@@ -302,18 +320,34 @@ async fn update_prices<T>(
 
 	let (dark_oracle_result, pyth_result) = tokio::join!(dark_oracle_fut, pyth_fut);
 
-	if let Err(e) = dark_oracle_result {
-		error!("Failed to update DarkOracle contract prices: {:?}", e);
+	match &dark_oracle_result {
+		Ok(prices) => info!("DarkOracle updated with prices: USDC={}, EURC={}", prices.usdc, prices.eurc),
+		Err(e) => error!("Failed to update DarkOracle contract prices: {:?}", e),
 	}
-	if let Err(e) = pyth_result {
-		error!("Failed to fetch/update Pyth prices: {:?}", e);
+	match &pyth_result {
+		Ok(prices) => info!("Pyth prices: USDC={}, EURC={}", prices.usdc, prices.eurc),
+		Err(e) => error!("Failed to fetch/update Pyth prices: {:?}", e),
+	}
+
+	// Price divergence validation. Mirrors `_validatePrice` in SafePriceProvider.sol (DarkOracle contract)
+	if let (Ok(dark_prices), Ok(pyth_prices)) = (&dark_oracle_result, &pyth_result) {
+
+		// Validate EURC
+		let fallback_price = pyth_prices.eurc;
+		let price = dark_prices.eurc;
+		let absolute_divergence = if fallback_price > price { fallback_price - price } else { price - fallback_price };
+		let bp_divergence = (absolute_divergence * BIPS_DIVISOR as f64) / fallback_price;
+		debug!("EURC price divergence: {:.2} bp (DarkOracle: {}, Pyth: {})", bp_divergence, price, fallback_price);
+		if bp_divergence > divergence_threshold_bp as f64 {
+			error!("EURC price divergence too high: {:.2} bp > {} bp", bp_divergence, divergence_threshold_bp);
+		}
 	}
 }
 
 async fn update_dark_oracle_contract_prices(
 	currencies: &Vec<CoinInfo>,
 	nonce_manager: Arc<NonceManager>,
-) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
+) -> Result<PriceData, Box<dyn Error + Send + Sync + 'static>> {
 	warn!("Starting contract price update...");
 	let private_key_str = std::env::var("PRIVATE_KEY").map_err(|_| "PRIVATE_KEY not set")?;
 	let contract_address =
@@ -388,7 +422,12 @@ async fn update_dark_oracle_contract_prices(
 	warn!("Transaction sent");
 	info!("DarkOracle updatePriceFeeds tx hash: {:?}", tx.tx_hash());
 
-	Ok(())
+	let usdc_raw = symbol_to_price.get("USDC").ok_or("USDC price not found")?;
+	let eurc_raw = symbol_to_price.get("EURC").ok_or("EURC price not found")?;
+	let usdc_units = *usdc_raw as f64 / 10f64.powi(18);
+	let eurc_units = *eurc_raw as f64 / 10f64.powi(18);
+
+	Ok(PriceData { usdc: usdc_units, eurc: eurc_units })
 }
 
 #[derive(Debug)]

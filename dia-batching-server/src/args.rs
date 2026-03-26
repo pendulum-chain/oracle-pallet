@@ -23,6 +23,10 @@ pub struct DiaApiArgs {
 	#[clap(long, env = "PYTH_UPDATE_INTERVAL_SECONDS", default_value = "300")]
 	pub pyth_update_interval_seconds: u64,
 
+	/// Maximum allowed price divergence in basis points (default 50 bps)
+	#[clap(long, env = "PRICE_DIVERGENCE_THRESHOLD_BP", default_value = "1")]
+	pub price_divergence_threshold_bp: u64,
+
 	/// Currencies to support
 	/// Each currency needs to have the format <blockchain>:<symbol>
 	/// Fiat currencies need to have the format FIAT:<from>-<to>
