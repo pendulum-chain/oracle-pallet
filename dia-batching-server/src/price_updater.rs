@@ -10,7 +10,7 @@ use alloy::{
 	sol,
 };
 use reqwest::Url;
-use log::{error, info, warn};
+use log::{error, info, warn, debug};
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use serde::Deserialize;
