@@ -195,7 +195,7 @@ where
 		let coins = Arc::clone(&storage);
 		update_prices(coins, &supported_currencies, &api, &mut pyth_updater, &nonce_manager, divergence_threshold_bp).await;
 		let elapsed = start.elapsed();
-		let target_duration = std::time::Duration::from_secs(2);
+		let target_duration = update_interval;
 		if elapsed < target_duration {
 			let sleep_duration = target_duration - elapsed;
 			tokio::time::sleep(sleep_duration).await;
@@ -339,7 +339,7 @@ async fn update_prices<T>(
 		let bp_divergence = (absolute_divergence * BIPS_DIVISOR as f64) / fallback_price;
 		debug!("EURC price divergence: {:.2} bp (DarkOracle: {}, Pyth: {})", bp_divergence, price, fallback_price);
 		if bp_divergence > divergence_threshold_bp as f64 {
-			error!("EURC price divergence too high: {:.2} bp > {} bp", bp_divergence, divergence_threshold_bp);
+			error!("EURC price divergence too high: {:.2} bp > {} bp (prices: DarkOracle: {}, Pyth: {})", bp_divergence, divergence_threshold_bp, price, fallback_price);
 		}
 	}
 }

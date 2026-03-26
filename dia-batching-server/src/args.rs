@@ -38,7 +38,7 @@ pub struct DiaApiArgs {
 	pub supported_currencies: SupportedCurrencies,
 
 	/// The port to run the server on
-	#[clap(short, long, env = "PORT", default_value = "8070")]
+	#[clap(short, long, env = "PORT", default_value = "10000")]
 	pub port: u16,
 
 	#[clap(flatten)]
