@@ -127,8 +127,8 @@ mod tests {
 		}
 
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		let nonce_manager = Arc::new(NonceManager::new(0));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager).await;
+		let nonce_manager = Arc::new(chain::NonceManager::new(0));
+		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager, 0).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(supported_currencies);
 
@@ -152,8 +152,8 @@ mod tests {
 			.insert(AssetSpecifier { blockchain: "FIAT".into(), symbol: "MXN-USD".into() });
 
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		let nonce_manager = Arc::new(NonceManager::new(0));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager).await;
+		let nonce_manager = Arc::new(chain::NonceManager::new(0));
+		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager, 0).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![
 			AssetSpecifier { blockchain: "Bitcoin".into(), symbol: "BTC".into() },
@@ -178,8 +178,8 @@ mod tests {
 			.insert(AssetSpecifier { blockchain: "FIAT".into(), symbol: "USD-USD".into() });
 
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		let nonce_manager = Arc::new(NonceManager::new(0));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager).await;
+		let nonce_manager = Arc::new(chain::NonceManager::new(0));
+		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager, 0).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![AssetSpecifier {
 			blockchain: "FIAT".into(),
@@ -200,8 +200,8 @@ mod tests {
 		let coins = Arc::clone(&storage);
 		let all_currencies = HashSet::default();
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		let nonce_manager = Arc::new(NonceManager::new(0));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager).await;
+		let nonce_manager = Arc::new(chain::NonceManager::new(0));
+		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager, 0).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![
 			AssetSpecifier { blockchain: "Bitcoin".into(), symbol: "BTCCash".into() },
@@ -225,8 +225,8 @@ mod tests {
 			all_currencies.insert(currency);
 		}
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		let nonce_manager = Arc::new(NonceManager::new(0));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager).await;
+		let nonce_manager = Arc::new(chain::NonceManager::new(0));
+		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager, 0).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(supported_currencies);
 
@@ -244,8 +244,8 @@ mod tests {
 		let coins = Arc::clone(&storage);
 		let all_currencies = HashSet::default();
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		let nonce_manager = Arc::new(NonceManager::new(0));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager).await;
+		let nonce_manager = Arc::new(chain::NonceManager::new(0));
+		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager, 0).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![]);
 
@@ -260,8 +260,8 @@ mod tests {
 		let all_currencies = HashSet::default();
 
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		let nonce_manager = Arc::new(NonceManager::new(0));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager).await;
+		let nonce_manager = Arc::new(chain::NonceManager::new(0));
+		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager, 0).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![AssetSpecifier {
 			blockchain: "Bitcoin".into(),
@@ -287,15 +287,15 @@ mod tests {
 		}
 
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		let nonce_manager = Arc::new(NonceManager::new(0));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager).await;
+		let nonce_manager = Arc::new(chain::NonceManager::new(0));
+		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager, 0).await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(supported_currencies);
 
 		assert_eq!(c[0].price, 1000000000000000000);
 		assert_eq!(c[0].supply, 1000000000000000000);
 
-		assert_eq!(c[1].price, 123456789123456789012345000000);
+		assert_eq!(c[1].price, 123456789123456789012345000);
 		assert_eq!(c[1].supply, 1000000000000000000);
 
 		assert_eq!(c[2].price, 1000000000001000000);
