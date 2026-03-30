@@ -1,20 +1,13 @@
-use crate::api::coingecko::CoingeckoPriceApi;
 use crate::api::coinbase::CoinbasePriceApi;
 use crate::api::custom::CustomPriceApi;
-use crate::api::error::{CoingeckoError, CoinbaseError, CustomError, PolygonError};
-use crate::api::polygon::PolygonPriceApi;
-use crate::args::{CoingeckoConfig, PolygonConfig};
+use crate::api::error::{CoinbaseError, CustomError};
 use crate::types::Quotation;
 use crate::AssetSpecifier;
 use async_trait::async_trait;
-use clap::Parser;
 
-mod binance;
-mod coingecko;
 mod coinbase;
 mod custom;
 mod error;
-mod polygon;
 
 #[async_trait]
 pub trait PriceApi {
@@ -45,8 +38,7 @@ impl PriceApi for PriceApiImpl {
 		let mut quotations = Vec::new();
 
 		// Split all assets into custom vs other assets. This is important because it could happen that
-		// a custom asset is also supported by the Polygon or Coingecko API. In this case, we want to
-		// use the custom asset and not the other API.
+		// a custom asset is also supported by another API Impl. We want to always select the custom implementation.
 		let (custom_assets, assets): (Vec<&AssetSpecifier>, Vec<&AssetSpecifier>) =
 			assets.into_iter().partition(|asset| self.custom_price_api.is_supported(asset));
 

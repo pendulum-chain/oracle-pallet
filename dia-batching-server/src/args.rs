@@ -20,11 +20,11 @@ pub struct DiaApiArgs {
 	pub update_interval_seconds: u64,
 
 	/// How often (in seconds) to update Pyth price feeds on-chain
-	#[clap(long, env = "PYTH_UPDATE_INTERVAL_SECONDS", default_value = "300")]
+	#[clap(long, env = "PYTH_UPDATE_INTERVAL_SECONDS", default_value = "60")]
 	pub pyth_update_interval_seconds: u64,
 
 	/// Maximum allowed price divergence in basis points (default 50 bps)
-	#[clap(long, env = "PRICE_DIVERGENCE_THRESHOLD_BP", default_value = "1")]
+	#[clap(long, env = "PRICE_DIVERGENCE_THRESHOLD_BP", default_value = "50")]
 	pub price_divergence_threshold_bp: u64,
 
 	/// Currencies to support
@@ -40,32 +40,4 @@ pub struct DiaApiArgs {
 	/// The port to run the server on
 	#[clap(short, long, env = "PORT", default_value = "10000")]
 	pub port: u16,
-
-	#[clap(flatten)]
-	pub coingecko_config: CoingeckoConfig,
-	#[clap(flatten)]
-	pub polygon_config: PolygonConfig,
-}
-
-#[derive(Parser, Debug, Clone)]
-pub struct CoingeckoConfig {
-	/// The API key for CoinGecko.
-	#[clap(long, env = "CG_API_KEY")]
-	pub cg_api_key: Option<String>,
-
-	/// The host URL for CoinGecko.
-	/// Defaults to the CoinGecko Pro API.
-	#[clap(long, env = "CG_HOST_URL", default_value = "https://pro-api.coingecko.com")]
-	pub cg_host_url: String,
-}
-
-#[derive(Parser, Debug, Clone)]
-pub struct PolygonConfig {
-	/// The API key for Polygon.io
-	#[clap(long, env = "PG_API_KEY")]
-	pub pg_api_key: Option<String>,
-
-	/// The host URL for the Polygon.io API.
-	#[clap(long, env = "PG_HOST_URL", default_value = "https://api.polygon.io")]
-	pub pg_host_url: String,
 }

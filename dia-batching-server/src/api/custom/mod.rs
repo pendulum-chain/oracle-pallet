@@ -4,13 +4,6 @@ use crate::AssetSpecifier;
 use async_trait::async_trait;
 use std::string::ToString;
 
-mod ampe;
-mod arsb;
-mod brl;
-
-use ampe::AmpePriceView;
-use arsb::ArsBluePriceView;
-use brl::BrlBluePriceView;
 
 #[async_trait]
 pub trait AssetCompatibility: Send + Sync {
@@ -27,9 +20,6 @@ impl CustomPriceApi {
 	pub fn new() -> Self {
 		CustomPriceApi {
 			apis: vec![
-				Box::new(AmpePriceView),
-				Box::new(ArsBluePriceView::new()),
-				Box::new(BrlBluePriceView::new()),
 			],
 		}
 	}
