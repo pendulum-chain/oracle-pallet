@@ -1,24 +1,19 @@
 use crate::api::PriceApi;
 use crate::storage::CoinInfoStorage;
-use crate::types::{CoinInfo, Quotation};
+use crate::types::{Quotation};
 use crate::AssetSpecifier;
 use async_trait::async_trait;
 use chrono::Utc;
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use super::*;
 
 #[cfg(test)]
 mod tests {
-	use std::{collections::HashMap, sync::Arc};
-
 	use super::*;
-	use async_trait::async_trait;
-	use chrono::Utc;
-	use rust_decimal_macros::dec;
 
 	struct MockDia {
 		quotation: HashMap<AssetSpecifier, Quotation>,
@@ -110,6 +105,30 @@ mod tests {
 		}
 	}
 
+	fn setup_test_env() {
+		std::env::set_var("PRIVATE_KEY", "0000000000000000000000000000000000000000000000000000000000000001");
+		std::env::set_var("RPC_URL", "http://localhost:8545");
+		std::env::set_var("CONTRACT_ADDRESS", "0x0000000000000000000000000000000000000000");
+		std::env::set_var("PYTH_ADAPTER_ADDRESS", "0x0000000000000000000000000000000000000000");
+	}
+
+	async fn setup_updaters() -> (PythPriceUpdater, DarkOracleUpdater, Arc<ChainClient>, Arc<ChainClient>) {
+		setup_test_env();
+		let pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300)).unwrap();
+		let dark_oracle_updater = DarkOracleUpdater::new().unwrap();
+		let nonce_manager = Arc::new(chain::NonceManager::new(0));
+		
+		// In tests, we don't actually need a working provider for these update_prices calls 
+		// because we are just testing the storage part in these specific tests.
+		// However, ChainClient::new expects a valid URL and performs some setup.
+		// Since we can't easily mock the whole provider chain without more complex setup,
+		// we just ensure construction doesn't panic.
+		let dark_oracle_client = Arc::new(ChainClient::new(nonce_manager.clone()).await.unwrap());
+		let pyth_client = Arc::new(ChainClient::new(nonce_manager).await.unwrap());
+		
+		(pyth_updater, dark_oracle_updater, dark_oracle_client, pyth_client)
+	}
+
 	#[tokio::test]
 	async fn test_update_prices() {
 		let mock_api = MockDia::new();
@@ -126,8 +145,7 @@ mod tests {
 			all_currencies.insert(currency);
 		}
 
-		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		let nonce_manager = Arc::new(chain::NonceManager::new(0));
+		let (mut pyth_updater, dark_oracle_updater, dark_oracle_client, pyth_client) = setup_updaters().await;
 
 		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
 		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
@@ -137,7 +155,9 @@ mod tests {
 			&all_currencies,
 			&mock_api,
 			&mut pyth_updater,
-			&nonce_manager,
+			&dark_oracle_updater,
+			dark_oracle_client,
+			pyth_client,
 			0,
 			&alert_tx,
 			&tx_tx,
@@ -147,9 +167,7 @@ mod tests {
 		let c = storage.get_currencies_by_blockchains_and_symbols(supported_currencies);
 
 		assert_eq!(4, c.len());
-
 		assert_eq!(c[1].price, 1000000000000000000);
-
 		assert_eq!(c[1].name, "ETH");
 	}
 
@@ -165,8 +183,7 @@ mod tests {
 		all_currencies
 			.insert(AssetSpecifier { blockchain: "FIAT".into(), symbol: "MXN-USD".into() });
 
-		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		let nonce_manager = Arc::new(chain::NonceManager::new(0));
+		let (mut pyth_updater, dark_oracle_updater, dark_oracle_client, pyth_client) = setup_updaters().await;
 
 		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
 		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
@@ -176,7 +193,9 @@ mod tests {
 			&all_currencies,
 			&mock_api,
 			&mut pyth_updater,
-			&nonce_manager,
+			&dark_oracle_updater,
+			dark_oracle_client,
+			pyth_client,
 			0,
 			&alert_tx,
 			&tx_tx,
@@ -189,9 +208,7 @@ mod tests {
 		]);
 
 		assert_eq!(2, c.len());
-
 		assert_eq!(c[1].price, 53712327000000000);
-
 		assert_eq!(c[1].name, "MXNUSD=X");
 	}
 
@@ -205,8 +222,7 @@ mod tests {
 		all_currencies
 			.insert(AssetSpecifier { blockchain: "FIAT".into(), symbol: "USD-USD".into() });
 
-		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		let nonce_manager = Arc::new(chain::NonceManager::new(0));
+		let (mut pyth_updater, dark_oracle_updater, dark_oracle_client, pyth_client) = setup_updaters().await;
 
 		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
 		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
@@ -216,7 +232,9 @@ mod tests {
 			&all_currencies,
 			&mock_api,
 			&mut pyth_updater,
-			&nonce_manager,
+			&dark_oracle_updater,
+			dark_oracle_client,
+			pyth_client,
 			0,
 			&alert_tx,
 			&tx_tx,
@@ -229,9 +247,7 @@ mod tests {
 		}]);
 
 		assert_eq!(1, c.len());
-
 		assert_eq!(c[0].price, 1000000000000000000);
-
 		assert_eq!(c[0].name, "USD-X");
 	}
 
@@ -241,8 +257,8 @@ mod tests {
 		let storage = Arc::new(CoinInfoStorage::default());
 		let coins = Arc::clone(&storage);
 		let all_currencies = HashSet::default();
-		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		let nonce_manager = Arc::new(chain::NonceManager::new(0));
+		
+		let (mut pyth_updater, dark_oracle_updater, dark_oracle_client, pyth_client) = setup_updaters().await;
 
 		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
 		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
@@ -252,7 +268,9 @@ mod tests {
 			&all_currencies,
 			&mock_api,
 			&mut pyth_updater,
-			&nonce_manager,
+			&dark_oracle_updater,
+			dark_oracle_client,
+			pyth_client,
 			0,
 			&alert_tx,
 			&tx_tx,
@@ -280,8 +298,8 @@ mod tests {
 		for currency in supported_currencies.clone() {
 			all_currencies.insert(currency);
 		}
-		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		let nonce_manager = Arc::new(chain::NonceManager::new(0));
+		
+		let (mut pyth_updater, dark_oracle_updater, dark_oracle_client, pyth_client) = setup_updaters().await;
 
 		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
 		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
@@ -291,7 +309,9 @@ mod tests {
 			&all_currencies,
 			&mock_api,
 			&mut pyth_updater,
-			&nonce_manager,
+			&dark_oracle_updater,
+			dark_oracle_client,
+			pyth_client,
 			0,
 			&alert_tx,
 			&tx_tx,
@@ -301,9 +321,7 @@ mod tests {
 		let c = storage.get_currencies_by_blockchains_and_symbols(supported_currencies);
 
 		assert_eq!(1, c.len());
-
 		assert_eq!(c[0].price, 1000000000000000000);
-
 		assert_eq!(c[0].name, "BTC");
 	}
 
@@ -313,8 +331,8 @@ mod tests {
 		let storage = Arc::new(CoinInfoStorage::default());
 		let coins = Arc::clone(&storage);
 		let all_currencies = HashSet::default();
-		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		let nonce_manager = Arc::new(chain::NonceManager::new(0));
+		
+		let (mut pyth_updater, dark_oracle_updater, dark_oracle_client, pyth_client) = setup_updaters().await;
 
 		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
 		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
@@ -324,7 +342,9 @@ mod tests {
 			&all_currencies,
 			&mock_api,
 			&mut pyth_updater,
-			&nonce_manager,
+			&dark_oracle_updater,
+			dark_oracle_client,
+			pyth_client,
 			0,
 			&alert_tx,
 			&tx_tx,
@@ -343,8 +363,7 @@ mod tests {
 		let coins = Arc::clone(&storage);
 		let all_currencies = HashSet::default();
 
-		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		let nonce_manager = Arc::new(chain::NonceManager::new(0));
+		let (mut pyth_updater, dark_oracle_updater, dark_oracle_client, pyth_client) = setup_updaters().await;
 
 		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
 		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
@@ -354,7 +373,9 @@ mod tests {
 			&all_currencies,
 			&mock_api,
 			&mut pyth_updater,
-			&nonce_manager,
+			&dark_oracle_updater,
+			dark_oracle_client,
+			pyth_client,
 			0,
 			&alert_tx,
 			&tx_tx,
@@ -384,8 +405,7 @@ mod tests {
 			all_currencies.insert(currency);
 		}
 
-		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
-		let nonce_manager = Arc::new(chain::NonceManager::new(0));
+		let (mut pyth_updater, dark_oracle_updater, dark_oracle_client, pyth_client) = setup_updaters().await;
 
 		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
 		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
@@ -395,7 +415,9 @@ mod tests {
 			&all_currencies,
 			&mock_api,
 			&mut pyth_updater,
-			&nonce_manager,
+			&dark_oracle_updater,
+			dark_oracle_client,
+			pyth_client,
 			0,
 			&alert_tx,
 			&tx_tx,

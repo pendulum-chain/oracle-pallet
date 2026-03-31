@@ -1,11 +1,13 @@
 pub mod alerts;
 pub mod chain;
+pub mod dark_oracle;
 pub mod helpers;
 pub mod pyth;
 pub mod tx_processor;
 
 pub use alerts::PriceDivergenceAlert;
-pub use chain::PriceData;
+pub use chain::{PriceData, ChainClient};
+pub use dark_oracle::DarkOracleUpdater;
 pub use pyth::PythPriceUpdater;
 pub use tx_processor::UpdateTx;
 
@@ -36,10 +38,14 @@ pub async fn run_update_prices_loop<T>(
 where
 	T: PriceApi + Send + Sync + 'static,
 {
-	let mut pyth_updater = PythPriceUpdater::new(pyth_update_interval);
-
-	let nonce_manager = chain::initialize_nonce_manager().await?;
-	info!("Initialized nonce manager");
+	let mut pyth_updater = PythPriceUpdater::new(pyth_update_interval)?;
+	let dark_oracle_updater = DarkOracleUpdater::new()?;
+	
+	let nonce_manager = ChainClient::create_nonce_manager().await?;
+	let dark_oracle_client = Arc::new(ChainClient::new(nonce_manager.clone()).await?);
+	let pyth_client = Arc::new(ChainClient::new(nonce_manager).await?);
+	
+	info!("Initialized chain clients and updaters");
 
 	loop {
 		let start = tokio::time::Instant::now();
@@ -49,7 +55,9 @@ where
 			&supported_currencies,
 			&api,
 			&mut pyth_updater,
-			&nonce_manager,
+			&dark_oracle_updater,
+			dark_oracle_client.clone(),
+			pyth_client.clone(),
 			divergence_threshold_bp,
 			&divergence_tx,
 			&update_tx,
@@ -67,7 +75,9 @@ pub(crate) async fn update_prices<T>(
 	supported_currencies: &HashSet<AssetSpecifier>,
 	api: &T,
 	pyth_updater: &mut PythPriceUpdater,
-	nonce_manager: &Arc<chain::NonceManager>,
+	dark_oracle_updater: &DarkOracleUpdater,
+	dark_oracle_client: Arc<ChainClient>,
+	pyth_client: Arc<ChainClient>,
 	divergence_threshold_bp: u64,
 	divergence_tx: &mpsc::Sender<PriceDivergenceAlert>,
 	update_tx: &mpsc::Sender<Tx>,
@@ -88,8 +98,8 @@ pub(crate) async fn update_prices<T>(
 
 
 	let (dark_oracle_result, pyth_result) = tokio::join!(
-		chain::update_dark_oracle_contract_prices(&currencies, nonce_manager.clone()),
-		pyth_updater.run_update_pyth_prices(nonce_manager.clone()),
+		dark_oracle_updater.update_prices(&currencies, dark_oracle_client),
+		pyth_updater.run_update(pyth_client),
 	);
 
 	let dark_oracle_prices: Option<PriceData> = match dark_oracle_result {

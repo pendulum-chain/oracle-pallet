@@ -1,5 +1,8 @@
-use alloy::primitives::B256;
-use super::chain::{self, NonceManager, PriceData};
+use alloy::{
+	primitives::{Address, Bytes, B256},
+	sol,
+};
+use super::chain::{ChainClient, PriceData};
 use log::{debug, error, info};
 use serde::Deserialize;
 use std::error::Error;
@@ -39,21 +42,38 @@ struct HermesResponse {
 }
 
 
+sol! {
+	#[sol(rpc)]
+	contract PythAdapter {
+		function getUpdateFee(bytes[] _updateData) external view returns (uint256 updateFee_);
+		function updatePriceFeeds(bytes[] _priceUpdateData) external payable returns (bool success_);
+	}
+}
+
 // ── Pyth price updater ────────────────────────────────────────────────────────
 
 pub struct PythPriceUpdater {
+	adapter_address: Address,
 	update_interval: std::time::Duration,
 	last_update: Option<std::time::Instant>,
 }
 
 impl PythPriceUpdater {
-	pub fn new(update_interval: std::time::Duration) -> Self {
-		Self { update_interval, last_update: None }
+	pub fn new(update_interval: std::time::Duration) -> Result<Self, Box<dyn Error + Send + Sync + 'static>> {
+		let pyth_adapter_address = std::env::var("PYTH_ADAPTER_ADDRESS")
+			.map_err(|_| "PYTH_ADAPTER_ADDRESS not set")?;
+		let addr = pyth_adapter_address.parse::<Address>()?;
+
+		Ok(Self { 
+			adapter_address: addr,
+			update_interval, 
+			last_update: None 
+		})
 	}
 
-	pub async fn run_update_pyth_prices(
+	pub async fn run_update(
 		&mut self,
-		nonce_manager: Arc<NonceManager>,
+		client: Arc<ChainClient>,
 	) -> Result<(Option<B256>, PriceData), Box<dyn Error + Send + Sync + 'static>> {
 		let should_update_contract = match self.last_update {
 			None => true,
@@ -94,10 +114,15 @@ impl PythPriceUpdater {
 		let price_data = PriceData { usdc, eurc };
 
 		let tx_hash = if should_update_contract {
-			let update_data: Vec<String> =
-				data.binary.data.iter().map(|hex| format!("0x{}", hex)).collect();
+			let bytes_data: Vec<Bytes> = data.binary.data
+				.iter()
+				.map(|hex_str| {
+					let stripped = hex_str.strip_prefix("0x").unwrap_or(hex_str);
+					Bytes::from(hex::decode(stripped).unwrap_or_default())
+				})
+				.collect();
 
-			match chain::update_pyth_contract_prices(&update_data, nonce_manager).await {
+			match self.update_contract(bytes_data, client).await {
 				Ok(hash) => {
 					self.last_update = Some(std::time::Instant::now());
 					info!("Pyth contract tx submitted ✓");
@@ -113,5 +138,33 @@ impl PythPriceUpdater {
 		};
 
 		Ok((tx_hash, price_data))
+	}
+
+	async fn update_contract(
+		&self,
+		bytes_data: Vec<Bytes>,
+		client: Arc<ChainClient>,
+	) -> Result<B256, Box<dyn Error + Send + Sync + 'static>> {
+		let pyth_adapter = PythAdapter::new(self.adapter_address, &*client.provider);
+
+		let update_fee = pyth_adapter.getUpdateFee(bytes_data.clone()).call().await?.updateFee_;
+		info!("Pyth update fee: {} wei", update_fee);
+
+		let priority_fee = client.estimate_priority_fee().await?;
+		info!("Pyth priority fee: {} wei", priority_fee);
+
+		let nonce = client.nonce_manager.next_nonce();
+		let call_builder = pyth_adapter
+			.updatePriceFeeds(bytes_data)
+			.value(update_fee)
+			.gas(10_000_000)
+			.max_priority_fee_per_gas(priority_fee)
+			.nonce(nonce);
+
+		let pending_tx = call_builder.send().await?;
+		let tx_hash = *pending_tx.tx_hash();
+		info!("Pyth updatePriceFeeds tx hash: {:?}", tx_hash);
+
+		Ok(tx_hash)
 	}
 }
