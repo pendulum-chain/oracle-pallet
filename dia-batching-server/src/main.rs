@@ -8,8 +8,14 @@ use crate::args::DiaApiArgs;
 use crate::types::AssetSpecifier;
 use actix_web::{web, App, HttpServer};
 use clap::Parser;
-use log::error;
+use log::{error, info};
 use std::sync::Arc;
+use tokio::sync::mpsc;
+
+use crate::price_updater::{
+	PriceDivergenceAlert, UpdateTx,
+	alerts, tx_processor,
+};
 
 mod api;
 mod args;
@@ -33,7 +39,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 		.filter_map(|asset| {
 			let (blockchain, symbol) =
 				asset.trim().split_once(":").or_else(|| {
-					error!("Invalid asset '{}' – every asset needs to have the form <blockchain>:<symbol>", asset);
+					error!("Invalid asset '{}' – every asset needs to have the form <blockchain>:<symbol>", asset);
 					None
 				})?;
 
@@ -50,7 +56,22 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 	let pyth_update_interval_seconds = args.pyth_update_interval_seconds;
 	let price_divergence_threshold_bp = args.price_divergence_threshold_bp;
 
+	let (divergence_tx, divergence_rx) = mpsc::channel::<PriceDivergenceAlert>(100);
+
 	tokio::spawn(async move {
+		info!("Starting price divergence alert processor");
+		alerts::run_divergence_alert_processor(divergence_rx).await;
+	});
+
+	let (update_tx, update_rx) = mpsc::channel::<UpdateTx>(200);
+
+	tokio::spawn(async move {
+		info!("Starting on-chain transaction processor");
+		tx_processor::run_tx_processor(update_rx).await;
+	});
+
+	tokio::spawn(async move {
+		info!("Starting price updater");
 		let price_api = PriceApiImpl::new();
 		let _ = price_updater::run_update_prices_loop(
 			storage,
@@ -59,7 +80,10 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 			std::time::Duration::from_secs(pyth_update_interval_seconds),
 			price_divergence_threshold_bp,
 			price_api,
-		).await;
+			divergence_tx,
+			update_tx,
+		)
+		.await;
 	});
 
 	let port = 10000;

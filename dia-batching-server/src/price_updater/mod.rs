@@ -1,20 +1,27 @@
+pub mod alerts;
 pub mod chain;
 pub mod helpers;
 pub mod pyth;
+pub mod tx_processor;
+
+pub use alerts::PriceDivergenceAlert;
 pub use chain::PriceData;
 pub use pyth::PythPriceUpdater;
+pub use tx_processor::UpdateTx;
 
 use crate::api::PriceApi;
-use std::sync::Arc;
 use crate::storage::CoinInfoStorage;
 use crate::AssetSpecifier;
-use log::{error, info, warn, debug};
+use helpers::{convert_to_coin_info, BIPS_DIVISOR};
+use log::{debug, error, info, warn};
 use std::collections::HashSet;
-use std::{error::Error};
+use std::error::Error;
+use alloy::primitives::B256;
+use std::sync::Arc;
+use tokio::sync::mpsc;
+use tx_processor::{UpdateTx as Tx, UpdateTxKind as TxKind};
 
-use helpers::{BIPS_DIVISOR, convert_to_coin_info};
-
-// ── Public entry point ────────────────────────────────────────────────────────
+// ── Public entry point ─────────────────────────────────────────────────────────
 
 pub async fn run_update_prices_loop<T>(
 	storage: Arc<CoinInfoStorage>,
@@ -23,25 +30,34 @@ pub async fn run_update_prices_loop<T>(
 	pyth_update_interval: std::time::Duration,
 	divergence_threshold_bp: u64,
 	api: T,
+	divergence_tx: mpsc::Sender<PriceDivergenceAlert>,
+	update_tx: mpsc::Sender<UpdateTx>,
 ) -> Result<(), Box<dyn Error + Send + Sync + 'static>>
 where
 	T: PriceApi + Send + Sync + 'static,
 {
 	let mut pyth_updater = PythPriceUpdater::new(pyth_update_interval);
 
-	// Initialize nonce manager
 	let nonce_manager = chain::initialize_nonce_manager().await?;
 	info!("Initialized nonce manager");
 
 	loop {
 		let start = tokio::time::Instant::now();
 		let coins = Arc::clone(&storage);
-		update_prices(coins, &supported_currencies, &api, &mut pyth_updater, &nonce_manager, divergence_threshold_bp).await;
+		update_prices(
+			coins,
+			&supported_currencies,
+			&api,
+			&mut pyth_updater,
+			&nonce_manager,
+			divergence_threshold_bp,
+			&divergence_tx,
+			&update_tx,
+		)
+		.await;
 		let elapsed = start.elapsed();
-		let target_duration = update_interval;
-		if elapsed < target_duration {
-			let sleep_duration = target_duration - elapsed;
-			tokio::time::sleep(sleep_duration).await;
+		if elapsed < update_interval {
+			tokio::time::sleep(update_interval - elapsed).await;
 		}
 	}
 }
@@ -53,49 +69,95 @@ pub(crate) async fn update_prices<T>(
 	pyth_updater: &mut PythPriceUpdater,
 	nonce_manager: &Arc<chain::NonceManager>,
 	divergence_threshold_bp: u64,
+	divergence_tx: &mpsc::Sender<PriceDivergenceAlert>,
+	update_tx: &mpsc::Sender<Tx>,
 ) where
 	T: PriceApi + Send + Sync + 'static,
 {
 	let mut currencies = vec![];
-
-	let supported_currencies_vec = supported_currencies.iter().collect::<Vec<_>>();
-
-	api.get_quotations(supported_currencies_vec)
+	api.get_quotations(supported_currencies.iter().collect())
 		.await
 		.into_iter()
-		.for_each(|quotation| match convert_to_coin_info(quotation) {
-			Ok(coin_info) => currencies.push(coin_info),
+		.for_each(|q| match convert_to_coin_info(q) {
+			Ok(ci) => currencies.push(ci),
 			Err(e) => error!("Error converting to CoinInfo: {:#?}", e),
 		});
 
 	coins.replace_currencies_by_symbols(currencies.clone());
-	info!("Currencies Updated");
+	info!("Currencies updated");
 
-	let dark_oracle_fut = chain::update_dark_oracle_contract_prices(&currencies, nonce_manager.clone());
-	let pyth_fut = pyth_updater.run_update_pyth_prices(nonce_manager.clone());
 
-	let (dark_oracle_result, pyth_result) = tokio::join!(dark_oracle_fut, pyth_fut);
+	let (dark_oracle_result, pyth_result) = tokio::join!(
+		chain::update_dark_oracle_contract_prices(&currencies, nonce_manager.clone()),
+		pyth_updater.run_update_pyth_prices(nonce_manager.clone()),
+	);
 
-	match &dark_oracle_result {
-		Ok(prices) => info!("DarkOracle updated with prices: USDC={}, EURC={}", prices.usdc, prices.eurc),
-		Err(e) => error!("Failed to update DarkOracle contract prices: {:?}", e),
+	let dark_oracle_prices: Option<PriceData> = match dark_oracle_result {
+		Ok((tx_hash, price_data)) => {
+			info!("DarkOracle tx submitted: USDC={}, EURC={}", price_data.usdc, price_data.eurc);
+			send_tx(update_tx, TxKind::DarkOracle, tx_hash);
+			Some(price_data)
+		}
+		Err(e) => {
+			error!("Failed to submit DarkOracle tx: {:?}", e);
+			None
+		}
+	};
+
+	let pyth_prices: Option<PriceData> = match pyth_result {
+		Ok((tx_hash_opt, price_data)) => {
+			info!("Pyth prices fetched: USDC={}, EURC={}", price_data.usdc, price_data.eurc);
+			if let Some(tx_hash) = tx_hash_opt {
+				send_tx(update_tx, TxKind::Pyth, tx_hash);
+			}
+			Some(price_data)
+		}
+		Err(e) => {
+			error!("Failed to fetch/submit Pyth prices: {:?}", e);
+			None
+		}
+	};
+
+	// Price divergence validation
+	// Mirrors `_validatePrice` in SafePriceProvider.sol (DarkOracle contract).
+	if let (Some(dark_oracle), Some(pyth)) = (dark_oracle_prices, pyth_prices) {
+		let fallback = pyth.eurc;
+		let price = dark_oracle.eurc;
+		let abs_div = if fallback > price { fallback - price } else { price - fallback };
+		let bp_div = (abs_div * BIPS_DIVISOR as f64) / fallback;
+		debug!("EURC divergence: {:.2} bp (DarkOracle: {}, Pyth: {})", bp_div, price, fallback);
+
+		if bp_div > divergence_threshold_bp as f64 {
+			if let Err(e) = divergence_tx.try_send(PriceDivergenceAlert {
+				asset: "EURC".to_string(),
+				bp_divergence: bp_div,
+				threshold_bp: divergence_threshold_bp,
+				dark_oracle_price: price,
+				pyth_price: fallback,
+			}) {
+				match e {
+					mpsc::error::TrySendError::Full(_) => {
+						warn!("Divergence alert channel full — alert dropped");
+					}
+					mpsc::error::TrySendError::Closed(_) => {
+						error!("Divergence alert channel closed");
+					}
+				}
+			}
+		}
 	}
-	match &pyth_result {
-		Ok(prices) => info!("Pyth prices: USDC={}, EURC={}", prices.usdc, prices.eurc),
-		Err(e) => error!("Failed to fetch/update Pyth prices: {:?}", e),
-	}
+}
 
-	// Price divergence validation. Mirrors `_validatePrice` in SafePriceProvider.sol (DarkOracle contract)
-	if let (Ok(dark_prices), Ok(pyth_prices)) = (&dark_oracle_result, &pyth_result) {
-
-		// Validate EURC
-		let fallback_price = pyth_prices.eurc;
-		let price = dark_prices.eurc;
-		let absolute_divergence = if fallback_price > price { fallback_price - price } else { price - fallback_price };
-		let bp_divergence = (absolute_divergence * BIPS_DIVISOR as f64) / fallback_price;
-		debug!("EURC price divergence: {:.2} bp (DarkOracle: {}, Pyth: {})", bp_divergence, price, fallback_price);
-		if bp_divergence > divergence_threshold_bp as f64 {
-			error!("EURC price divergence too high: {:.2} bp > {} bp (prices: DarkOracle: {}, Pyth: {})", bp_divergence, divergence_threshold_bp, price, fallback_price);
+/// Forwards a transaction hash to the tx_processor channel via `try_send`.
+fn send_tx(tx: &mpsc::Sender<Tx>, kind: TxKind, tx_hash: B256) {
+	if let Err(e) = tx.try_send(Tx { kind, tx_hash }) {
+		match e {
+			mpsc::error::TrySendError::Full(_) => {
+				warn!("[{kind}] tx_processor channel full — tx_hash dropped");
+			}
+			mpsc::error::TrySendError::Closed(_) => {
+				error!("[{kind}] tx_processor channel closed");
+			}
 		}
 	}
 }

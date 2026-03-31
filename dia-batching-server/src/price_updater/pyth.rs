@@ -1,6 +1,6 @@
-use super::chain::{self, NonceManager};
-use log::{error, info, warn, debug};
-use reqwest::Url;
+use alloy::primitives::B256;
+use super::chain::{self, NonceManager, PriceData};
+use log::{debug, error, info};
 use serde::Deserialize;
 use std::error::Error;
 use std::sync::Arc;
@@ -54,7 +54,7 @@ impl PythPriceUpdater {
 	pub async fn run_update_pyth_prices(
 		&mut self,
 		nonce_manager: Arc<NonceManager>,
-	) -> Result<chain::PriceData, Box<dyn Error + Send + Sync + 'static>> {
+	) -> Result<(Option<B256>, PriceData), Box<dyn Error + Send + Sync + 'static>> {
 		let should_update_contract = match self.last_update {
 			None => true,
 			Some(t) => t.elapsed() >= self.update_interval,
@@ -91,21 +91,27 @@ impl PythPriceUpdater {
 		let usdc = usdc_price.ok_or("USDC price not found")?;
 		let eurc = eurc_price.ok_or("EURC price not found")?;
 
-		if should_update_contract {
+		let price_data = PriceData { usdc, eurc };
+
+		let tx_hash = if should_update_contract {
 			let update_data: Vec<String> =
 				data.binary.data.iter().map(|hex| format!("0x{}", hex)).collect();
-			if let Err(e) =
-				chain::update_pyth_contract_prices(&update_data, nonce_manager.clone()).await
-			{
-				error!("Failed to update Pyth contract prices: {:?}", e);
-			} else {
-				info!("Pyth prices updated on-chain ✓");
-				self.last_update = Some(std::time::Instant::now());
-			}
-		}
 
-		Ok(chain::PriceData { usdc, eurc })
+			match chain::update_pyth_contract_prices(&update_data, nonce_manager).await {
+				Ok(hash) => {
+					self.last_update = Some(std::time::Instant::now());
+					info!("Pyth contract tx submitted ✓");
+					Some(hash)
+				}
+				Err(e) => {
+					error!("Failed to submit Pyth contract tx: {:?}", e);
+					None
+				}
+			}
+		} else {
+			None
+		};
+
+		Ok((tx_hash, price_data))
 	}
 }
-
-

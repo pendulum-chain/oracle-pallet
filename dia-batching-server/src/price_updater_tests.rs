@@ -128,7 +128,21 @@ mod tests {
 
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
 		let nonce_manager = Arc::new(chain::NonceManager::new(0));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager, 0).await;
+
+		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
+		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
+
+		update_prices(
+			coins,
+			&all_currencies,
+			&mock_api,
+			&mut pyth_updater,
+			&nonce_manager,
+			0,
+			&alert_tx,
+			&tx_tx,
+		)
+		.await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(supported_currencies);
 
@@ -153,7 +167,21 @@ mod tests {
 
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
 		let nonce_manager = Arc::new(chain::NonceManager::new(0));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager, 0).await;
+
+		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
+		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
+
+		update_prices(
+			coins,
+			&all_currencies,
+			&mock_api,
+			&mut pyth_updater,
+			&nonce_manager,
+			0,
+			&alert_tx,
+			&tx_tx,
+		)
+		.await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![
 			AssetSpecifier { blockchain: "Bitcoin".into(), symbol: "BTC".into() },
@@ -179,7 +207,21 @@ mod tests {
 
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
 		let nonce_manager = Arc::new(chain::NonceManager::new(0));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager, 0).await;
+
+		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
+		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
+
+		update_prices(
+			coins,
+			&all_currencies,
+			&mock_api,
+			&mut pyth_updater,
+			&nonce_manager,
+			0,
+			&alert_tx,
+			&tx_tx,
+		)
+		.await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![AssetSpecifier {
 			blockchain: "FIAT".into(),
@@ -201,7 +243,21 @@ mod tests {
 		let all_currencies = HashSet::default();
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
 		let nonce_manager = Arc::new(chain::NonceManager::new(0));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager, 0).await;
+
+		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
+		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
+
+		update_prices(
+			coins,
+			&all_currencies,
+			&mock_api,
+			&mut pyth_updater,
+			&nonce_manager,
+			0,
+			&alert_tx,
+			&tx_tx,
+		)
+		.await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![
 			AssetSpecifier { blockchain: "Bitcoin".into(), symbol: "BTCCash".into() },
@@ -226,7 +282,21 @@ mod tests {
 		}
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
 		let nonce_manager = Arc::new(chain::NonceManager::new(0));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager, 0).await;
+
+		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
+		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
+
+		update_prices(
+			coins,
+			&all_currencies,
+			&mock_api,
+			&mut pyth_updater,
+			&nonce_manager,
+			0,
+			&alert_tx,
+			&tx_tx,
+		)
+		.await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(supported_currencies);
 
@@ -245,7 +315,21 @@ mod tests {
 		let all_currencies = HashSet::default();
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
 		let nonce_manager = Arc::new(chain::NonceManager::new(0));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager, 0).await;
+
+		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
+		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
+
+		update_prices(
+			coins,
+			&all_currencies,
+			&mock_api,
+			&mut pyth_updater,
+			&nonce_manager,
+			0,
+			&alert_tx,
+			&tx_tx,
+		)
+		.await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![]);
 
@@ -261,7 +345,21 @@ mod tests {
 
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
 		let nonce_manager = Arc::new(chain::NonceManager::new(0));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager, 0).await;
+
+		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
+		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
+
+		update_prices(
+			coins,
+			&all_currencies,
+			&mock_api,
+			&mut pyth_updater,
+			&nonce_manager,
+			0,
+			&alert_tx,
+			&tx_tx,
+		)
+		.await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![AssetSpecifier {
 			blockchain: "Bitcoin".into(),
@@ -288,7 +386,21 @@ mod tests {
 
 		let mut pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300));
 		let nonce_manager = Arc::new(chain::NonceManager::new(0));
-		update_prices(coins, &all_currencies, &mock_api, &mut pyth_updater, &nonce_manager, 0).await;
+
+		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
+		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
+
+		update_prices(
+			coins,
+			&all_currencies,
+			&mock_api,
+			&mut pyth_updater,
+			&nonce_manager,
+			0,
+			&alert_tx,
+			&tx_tx,
+		)
+		.await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(supported_currencies);
 

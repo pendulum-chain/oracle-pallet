@@ -1,21 +1,19 @@
 use alloy::{
-	primitives::{Address, Bytes, Uint, U256},
-	providers::{ProviderBuilder, Provider},
 	network::EthereumWallet,
+	primitives::{Address, Bytes, B256},
+	providers::{Provider, ProviderBuilder},
 	signers::local::PrivateKeySigner,
 	sol,
 };
+use log::{info, warn};
 use reqwest::Url;
-use log::{error, info, warn};
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::sync::{Arc, Mutex};
-use std::{error::Error};
+use std::error::Error;
 use std::str::FromStr;
-use crate::types::CoinInfo;
+use std::sync::{Arc, Mutex};
 
-type U48 = Uint<48, 1>;
-type U56 = Uint<56, 1>;
+use crate::types::CoinInfo;
 
 pub struct NonceManager {
 	nonce: Mutex<u64>,
@@ -73,7 +71,7 @@ pub struct PriceData {
 pub async fn update_dark_oracle_contract_prices(
 	currencies: &Vec<CoinInfo>,
 	nonce_manager: Arc<NonceManager>,
-) -> Result<PriceData, Box<dyn Error + Send + Sync + 'static>> {
+) -> Result<(B256, PriceData), Box<dyn Error + Send + Sync + 'static>> {
 	warn!("Starting contract price update...");
 	let private_key_str = std::env::var("PRIVATE_KEY").map_err(|_| "PRIVATE_KEY not set")?;
 	let contract_address =
@@ -142,24 +140,33 @@ pub async fn update_dark_oracle_contract_prices(
 	info!("DarkOracle priority fee: {} wei", priority_fee);
 
 	let nonce = nonce_manager.next_nonce();
-	let call = oracle.updatePriceFeeds(prices, timestamp).gas(10_000_000).max_priority_fee_per_gas(priority_fee).nonce(nonce);
+	let call_builder = oracle
+		.updatePriceFeeds(prices, timestamp)
+		.gas(10_000_000)
+		.max_priority_fee_per_gas(priority_fee)
+		.nonce(nonce);
+
 	warn!("Sending transaction with gas limit: 10,000,000");
-	let tx = call.send().await?;
-	warn!("Transaction sent");
-	info!("DarkOracle updatePriceFeeds tx hash: {:?}", tx.tx_hash());
+	let pending_tx = call_builder.send().await?;
+	warn!("DarkOracle transaction submitted");
+	let tx_hash = *pending_tx.tx_hash();
+	info!("DarkOracle updatePriceFeeds tx hash: {:?}", tx_hash);
 
 	let usdc_raw = symbol_to_price.get("USDC").ok_or("USDC price not found")?;
 	let eurc_raw = symbol_to_price.get("EURC").ok_or("EURC price not found")?;
-	let usdc_units = *usdc_raw as f64 / 10f64.powi(18);
-	let eurc_units = *eurc_raw as f64 / 10f64.powi(18);
+	let price_data = PriceData {
+		usdc: *usdc_raw as f64 / 10f64.powi(18),
+		eurc: *eurc_raw as f64 / 10f64.powi(18),
+	};
 
-	Ok(PriceData { usdc: usdc_units, eurc: eurc_units })
+	Ok((tx_hash, price_data))
 }
+
 
 pub async fn update_pyth_contract_prices(
 	update_data: &[String],
 	nonce_manager: Arc<NonceManager>,
-) -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
+) -> Result<B256, Box<dyn Error + Send + Sync + 'static>> {
 	let private_key_str = std::env::var("PRIVATE_KEY").map_err(|_| "PRIVATE_KEY not set")?;
 	let pyth_adapter_address = std::env::var("PYTH_ADAPTER_ADDRESS")
 		.map_err(|_| "PYTH_ADAPTER_ADDRESS not set")?;
@@ -177,7 +184,7 @@ pub async fn update_pyth_contract_prices(
 		.on_http(Url::parse(&rpc_url).expect("Invalid RPC_URL"));
 
 	let addr = pyth_adapter_address.parse::<Address>()?;
-	let pyth_adapter = PythAdapter::new(addr, &provider);
+	let pyth_adapter = PythAdapter::new(addr, provider.clone());
 
 	let bytes_data: Vec<Bytes> = update_data
 		.iter()
@@ -200,16 +207,17 @@ pub async fn update_pyth_contract_prices(
 
 	// Send the update transaction
 	let nonce = nonce_manager.next_nonce();
-	let call = pyth_adapter
+	let call_builder = pyth_adapter
 		.updatePriceFeeds(bytes_data)
 		.value(update_fee)
 		.gas(10_000_000)
 		.max_priority_fee_per_gas(priority_fee)
 		.nonce(nonce);
-	let tx = call.send().await?;
 
-	warn!("Pyth updatePriceFeeds tx sent");
-	info!("Pyth updatePriceFeeds tx hash: {:?}", tx.tx_hash());
+	let pending_tx = call_builder.send().await?;
+	warn!("Pyth transaction submitted");
+	let tx_hash = *pending_tx.tx_hash();
+	info!("Pyth updatePriceFeeds tx hash: {:?}", tx_hash);
 
-	Ok(())
+	Ok(tx_hash)
 }
