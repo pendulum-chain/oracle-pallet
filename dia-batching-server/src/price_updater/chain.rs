@@ -12,6 +12,7 @@ use std::convert::TryFrom;
 use std::sync::{Arc, Mutex};
 use std::{error::Error};
 use std::str::FromStr;
+use crate::types::CoinInfo;
 
 type U48 = Uint<48, 1>;
 type U56 = Uint<56, 1>;
@@ -70,7 +71,7 @@ pub struct PriceData {
 }
 
 pub async fn update_dark_oracle_contract_prices(
-	currencies: &Vec<super::CoinInfo>,
+	currencies: &Vec<CoinInfo>,
 	nonce_manager: Arc<NonceManager>,
 ) -> Result<PriceData, Box<dyn Error + Send + Sync + 'static>> {
 	warn!("Starting contract price update...");

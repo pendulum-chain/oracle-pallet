@@ -1,4 +1,5 @@
 pub mod chain;
+pub mod helpers;
 pub mod pyth;
 pub use chain::PriceData;
 pub use pyth::PythPriceUpdater;
@@ -6,16 +7,12 @@ pub use pyth::PythPriceUpdater;
 use crate::api::PriceApi;
 use std::sync::Arc;
 use crate::storage::CoinInfoStorage;
-use crate::types::{CoinInfo, Quotation};
 use crate::AssetSpecifier;
 use log::{error, info, warn, debug};
-use rust_decimal::prelude::ToPrimitive;
-use rust_decimal::Decimal;
 use std::collections::HashSet;
-use std::fmt::{Display, Formatter};
 use std::{error::Error};
 
-const BIPS_DIVISOR: u64 = 10000;
+use helpers::{BIPS_DIVISOR, convert_to_coin_info};
 
 // ── Public entry point ────────────────────────────────────────────────────────
 
@@ -47,24 +44,6 @@ where
 			tokio::time::sleep(sleep_duration).await;
 		}
 	}
-}
-
-fn convert_to_coin_info(value: Quotation) -> Result<CoinInfo, Box<dyn Error + Sync + Send>> {
-	let Quotation { name, symbol, blockchain, price, time, supply } = value;
-
-	let price = convert_decimal_to_u128(&price)?;
-	let supply = convert_decimal_to_u128(&supply)?;
-
-	let coin_info = CoinInfo {
-		name: name.into(),
-		symbol: symbol.into(),
-		blockchain: blockchain.unwrap_or("FIAT".to_string()).into(),
-		price,
-		last_update_timestamp: time,
-		supply,
-	};
-
-	Ok(coin_info)
 }
 
 pub(crate) async fn update_prices<T>(
@@ -119,34 +98,6 @@ pub(crate) async fn update_prices<T>(
 			error!("EURC price divergence too high: {:.2} bp > {} bp (prices: DarkOracle: {}, Pyth: {})", bp_divergence, divergence_threshold_bp, price, fallback_price);
 		}
 	}
-}
-
-
-
-#[derive(Debug)]
-pub enum ConvertingError {
-	DecimalTooLarge,
-}
-
-impl Display for ConvertingError {
-	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-		match self {
-			ConvertingError::DecimalTooLarge => write!(f, "Decimal given is too large"),
-		}
-	}
-}
-
-impl Error for ConvertingError {}
-
-fn convert_decimal_to_u128(input: &Decimal) -> Result<u128, ConvertingError> {
-	let fract = (input.fract() * Decimal::from(1_000_000_000_000_000_000_u128))
-		.to_u128()
-		.ok_or(ConvertingError::DecimalTooLarge)?;
-	let trunc = (input.trunc() * Decimal::from(1_000_000_000_000_000_000_u128))
-		.to_u128()
-		.ok_or(ConvertingError::DecimalTooLarge)?;
-
-	Ok(trunc.saturating_add(fract))
 }
 
 #[cfg(test)]

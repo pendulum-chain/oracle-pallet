@@ -39,9 +39,6 @@ struct HermesResponse {
 }
 
 
-
-
-
 // ── Pyth price updater ────────────────────────────────────────────────────────
 
 pub struct PythPriceUpdater {
