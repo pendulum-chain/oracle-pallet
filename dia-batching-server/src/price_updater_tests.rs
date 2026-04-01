@@ -1,114 +1,19 @@
 use crate::api::PriceApi;
 use crate::storage::CoinInfoStorage;
-use crate::types::{CoinInfo, Quotation};
+use crate::types::{Quotation};
 use crate::AssetSpecifier;
-use log::{error, info};
-use rust_decimal::prelude::ToPrimitive;
+use async_trait::async_trait;
+use chrono::Utc;
 use rust_decimal::Decimal;
-use std::collections::HashSet;
-use std::fmt::{Display, Formatter};
-use std::{error::Error, sync::Arc};
+use rust_decimal_macros::dec;
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
-pub async fn run_update_prices_loop<T>(
-	storage: Arc<CoinInfoStorage>,
-	supported_currencies: HashSet<AssetSpecifier>,
-	update_interval: std::time::Duration,
-	api: T,
-) -> Result<(), Box<dyn Error + Send + Sync + 'static>>
-where
-	T: PriceApi + Send + Sync + 'static,
-{
-	let coins = Arc::clone(&storage);
-	let _ = tokio::spawn(async move {
-		loop {
-			let time_elapsed = std::time::Instant::now();
-
-			let coins = Arc::clone(&coins);
-
-			update_prices(coins, &supported_currencies, &api).await;
-
-			tokio::time::sleep(update_interval.saturating_sub(time_elapsed.elapsed())).await;
-		}
-	});
-
-	Ok(())
-}
-
-fn convert_to_coin_info(value: Quotation) -> Result<CoinInfo, Box<dyn Error + Sync + Send>> {
-	let Quotation { name, symbol, blockchain, price, time, supply } = value;
-
-	let price = convert_decimal_to_u128(&price)?;
-	let supply = convert_decimal_to_u128(&supply)?;
-
-	let coin_info = CoinInfo {
-		name: name.into(),
-		symbol: symbol.into(),
-		blockchain: blockchain.unwrap_or("FIAT".to_string()).into(),
-		price,
-		last_update_timestamp: time,
-		supply,
-	};
-
-	Ok(coin_info)
-}
-
-async fn update_prices<T>(
-	coins: Arc<CoinInfoStorage>,
-	supported_currencies: &HashSet<AssetSpecifier>,
-	api: &T,
-) where
-	T: PriceApi + Send + Sync + 'static,
-{
-	let mut currencies = vec![];
-
-	let supported_currencies = supported_currencies.iter().collect::<Vec<_>>();
-
-	api.get_quotations(supported_currencies)
-		.await
-		.into_iter()
-		.for_each(|quotation| match convert_to_coin_info(quotation) {
-			Ok(coin_info) => currencies.push(coin_info),
-			Err(e) => error!("Error converting to CoinInfo: {:#?}", e),
-		});
-
-	coins.replace_currencies_by_symbols(currencies);
-	info!("Currencies Updated");
-}
-
-#[derive(Debug)]
-pub enum ConvertingError {
-	DecimalTooLarge,
-}
-
-impl Display for ConvertingError {
-	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-		match self {
-			ConvertingError::DecimalTooLarge => write!(f, "Decimal given is too large"),
-		}
-	}
-}
-
-impl Error for ConvertingError {}
-
-fn convert_decimal_to_u128(input: &Decimal) -> Result<u128, ConvertingError> {
-	let fract = (input.fract() * Decimal::from(1_000_000_000_000_u128))
-		.to_u128()
-		.ok_or(ConvertingError::DecimalTooLarge)?;
-	let trunc = (input.trunc() * Decimal::from(1_000_000_000_000_u128))
-		.to_u128()
-		.ok_or(ConvertingError::DecimalTooLarge)?;
-
-	Ok(trunc.saturating_add(fract))
-}
+use super::*;
 
 #[cfg(test)]
 mod tests {
-	use std::{collections::HashMap, sync::Arc};
-
 	use super::*;
-	use async_trait::async_trait;
-	use chrono::Utc;
-	use rust_decimal_macros::dec;
 
 	struct MockDia {
 		quotation: HashMap<AssetSpecifier, Quotation>,
@@ -200,6 +105,30 @@ mod tests {
 		}
 	}
 
+	fn setup_test_env() {
+		std::env::set_var("PRIVATE_KEY", "0000000000000000000000000000000000000000000000000000000000000001");
+		std::env::set_var("RPC_URL", "http://localhost:8545");
+		std::env::set_var("CONTRACT_ADDRESS", "0x0000000000000000000000000000000000000000");
+		std::env::set_var("PYTH_ADAPTER_ADDRESS", "0x0000000000000000000000000000000000000000");
+	}
+
+	async fn setup_updaters() -> (PythPriceUpdater, DarkOracleUpdater, Arc<ChainClient>, Arc<ChainClient>) {
+		setup_test_env();
+		let pyth_updater = PythPriceUpdater::new(std::time::Duration::from_secs(300)).unwrap();
+		let dark_oracle_updater = DarkOracleUpdater::new().unwrap();
+		let nonce_manager = Arc::new(chain::NonceManager::new(0));
+		
+		// In tests, we don't actually need a working provider for these update_prices calls 
+		// because we are just testing the storage part in these specific tests.
+		// However, ChainClient::new expects a valid URL and performs some setup.
+		// Since we can't easily mock the whole provider chain without more complex setup,
+		// we just ensure construction doesn't panic.
+		let dark_oracle_client = Arc::new(ChainClient::new(nonce_manager.clone()).await.unwrap());
+		let pyth_client = Arc::new(ChainClient::new(nonce_manager).await.unwrap());
+		
+		(pyth_updater, dark_oracle_updater, dark_oracle_client, pyth_client)
+	}
+
 	#[tokio::test]
 	async fn test_update_prices() {
 		let mock_api = MockDia::new();
@@ -216,14 +145,29 @@ mod tests {
 			all_currencies.insert(currency);
 		}
 
-		update_prices(coins, &all_currencies, &mock_api).await;
+		let (mut pyth_updater, dark_oracle_updater, dark_oracle_client, pyth_client) = setup_updaters().await;
+
+		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
+		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
+
+		update_prices(
+			coins,
+			&all_currencies,
+			&mock_api,
+			&mut pyth_updater,
+			&dark_oracle_updater,
+			dark_oracle_client,
+			pyth_client,
+			0,
+			&alert_tx,
+			&tx_tx,
+		)
+		.await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(supported_currencies);
 
 		assert_eq!(4, c.len());
-
-		assert_eq!(c[1].price, 1000000000000);
-
+		assert_eq!(c[1].price, 1000000000000000000);
 		assert_eq!(c[1].name, "ETH");
 	}
 
@@ -239,7 +183,24 @@ mod tests {
 		all_currencies
 			.insert(AssetSpecifier { blockchain: "FIAT".into(), symbol: "MXN-USD".into() });
 
-		update_prices(coins, &all_currencies, &mock_api).await;
+		let (mut pyth_updater, dark_oracle_updater, dark_oracle_client, pyth_client) = setup_updaters().await;
+
+		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
+		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
+
+		update_prices(
+			coins,
+			&all_currencies,
+			&mock_api,
+			&mut pyth_updater,
+			&dark_oracle_updater,
+			dark_oracle_client,
+			pyth_client,
+			0,
+			&alert_tx,
+			&tx_tx,
+		)
+		.await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![
 			AssetSpecifier { blockchain: "Bitcoin".into(), symbol: "BTC".into() },
@@ -247,9 +208,7 @@ mod tests {
 		]);
 
 		assert_eq!(2, c.len());
-
-		assert_eq!(c[1].price, 53712327000);
-
+		assert_eq!(c[1].price, 53712327000000000);
 		assert_eq!(c[1].name, "MXNUSD=X");
 	}
 
@@ -263,7 +222,24 @@ mod tests {
 		all_currencies
 			.insert(AssetSpecifier { blockchain: "FIAT".into(), symbol: "USD-USD".into() });
 
-		update_prices(coins, &all_currencies, &mock_api).await;
+		let (mut pyth_updater, dark_oracle_updater, dark_oracle_client, pyth_client) = setup_updaters().await;
+
+		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
+		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
+
+		update_prices(
+			coins,
+			&all_currencies,
+			&mock_api,
+			&mut pyth_updater,
+			&dark_oracle_updater,
+			dark_oracle_client,
+			pyth_client,
+			0,
+			&alert_tx,
+			&tx_tx,
+		)
+		.await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![AssetSpecifier {
 			blockchain: "FIAT".into(),
@@ -271,9 +247,7 @@ mod tests {
 		}]);
 
 		assert_eq!(1, c.len());
-
-		assert_eq!(c[0].price, 1000000000000);
-
+		assert_eq!(c[0].price, 1000000000000000000);
 		assert_eq!(c[0].name, "USD-X");
 	}
 
@@ -283,7 +257,25 @@ mod tests {
 		let storage = Arc::new(CoinInfoStorage::default());
 		let coins = Arc::clone(&storage);
 		let all_currencies = HashSet::default();
-		update_prices(coins, &all_currencies, &mock_api).await;
+		
+		let (mut pyth_updater, dark_oracle_updater, dark_oracle_client, pyth_client) = setup_updaters().await;
+
+		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
+		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
+
+		update_prices(
+			coins,
+			&all_currencies,
+			&mock_api,
+			&mut pyth_updater,
+			&dark_oracle_updater,
+			dark_oracle_client,
+			pyth_client,
+			0,
+			&alert_tx,
+			&tx_tx,
+		)
+		.await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![
 			AssetSpecifier { blockchain: "Bitcoin".into(), symbol: "BTCCash".into() },
@@ -306,14 +298,30 @@ mod tests {
 		for currency in supported_currencies.clone() {
 			all_currencies.insert(currency);
 		}
-		update_prices(coins, &all_currencies, &mock_api).await;
+		
+		let (mut pyth_updater, dark_oracle_updater, dark_oracle_client, pyth_client) = setup_updaters().await;
+
+		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
+		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
+
+		update_prices(
+			coins,
+			&all_currencies,
+			&mock_api,
+			&mut pyth_updater,
+			&dark_oracle_updater,
+			dark_oracle_client,
+			pyth_client,
+			0,
+			&alert_tx,
+			&tx_tx,
+		)
+		.await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(supported_currencies);
 
 		assert_eq!(1, c.len());
-
-		assert_eq!(c[0].price, 1000000000000);
-
+		assert_eq!(c[0].price, 1000000000000000000);
 		assert_eq!(c[0].name, "BTC");
 	}
 
@@ -323,7 +331,25 @@ mod tests {
 		let storage = Arc::new(CoinInfoStorage::default());
 		let coins = Arc::clone(&storage);
 		let all_currencies = HashSet::default();
-		update_prices(coins, &all_currencies, &mock_api).await;
+		
+		let (mut pyth_updater, dark_oracle_updater, dark_oracle_client, pyth_client) = setup_updaters().await;
+
+		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
+		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
+
+		update_prices(
+			coins,
+			&all_currencies,
+			&mock_api,
+			&mut pyth_updater,
+			&dark_oracle_updater,
+			dark_oracle_client,
+			pyth_client,
+			0,
+			&alert_tx,
+			&tx_tx,
+		)
+		.await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![]);
 
@@ -337,7 +363,24 @@ mod tests {
 		let coins = Arc::clone(&storage);
 		let all_currencies = HashSet::default();
 
-		update_prices(coins, &all_currencies, &mock_api).await;
+		let (mut pyth_updater, dark_oracle_updater, dark_oracle_client, pyth_client) = setup_updaters().await;
+
+		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
+		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
+
+		update_prices(
+			coins,
+			&all_currencies,
+			&mock_api,
+			&mut pyth_updater,
+			&dark_oracle_updater,
+			dark_oracle_client,
+			pyth_client,
+			0,
+			&alert_tx,
+			&tx_tx,
+		)
+		.await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(vec![AssetSpecifier {
 			blockchain: "Bitcoin".into(),
@@ -362,18 +405,35 @@ mod tests {
 			all_currencies.insert(currency);
 		}
 
-		update_prices(coins, &all_currencies, &mock_api).await;
+		let (mut pyth_updater, dark_oracle_updater, dark_oracle_client, pyth_client) = setup_updaters().await;
+
+		let (alert_tx, _) = tokio::sync::mpsc::channel(1);
+		let (tx_tx, _) = tokio::sync::mpsc::channel(1);
+
+		update_prices(
+			coins,
+			&all_currencies,
+			&mock_api,
+			&mut pyth_updater,
+			&dark_oracle_updater,
+			dark_oracle_client,
+			pyth_client,
+			0,
+			&alert_tx,
+			&tx_tx,
+		)
+		.await;
 
 		let c = storage.get_currencies_by_blockchains_and_symbols(supported_currencies);
 
-		assert_eq!(c[0].price, 1000000000000);
-		assert_eq!(c[0].supply, 1000000000000);
+		assert_eq!(c[0].price, 1000000000000000000);
+		assert_eq!(c[0].supply, 1000000000000000000);
 
-		assert_eq!(c[1].price, 123456789123456789012);
-		assert_eq!(c[1].supply, 1000000000000);
+		assert_eq!(c[1].price, 123456789123456789012345000);
+		assert_eq!(c[1].supply, 1000000000000000000);
 
-		assert_eq!(c[2].price, 1000000000001);
-		assert_eq!(c[2].supply, 1000000000000);
+		assert_eq!(c[2].price, 1000000000001000000);
+		assert_eq!(c[2].supply, 1000000000000000000);
 
 		assert_eq!(c[0].name, "BTC");
 		assert_eq!(c[1].name, "USDC");

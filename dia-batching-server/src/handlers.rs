@@ -2,7 +2,7 @@ use crate::storage::CoinInfoStorage;
 use crate::types::CoinInfo;
 use crate::AssetSpecifier;
 use actix_web::web::Json;
-use actix_web::{post, web};
+use actix_web::{get, post, web, HttpResponse};
 
 #[post("/currencies")]
 pub async fn currencies_post(
@@ -11,6 +11,11 @@ pub async fn currencies_post(
 ) -> Json<Vec<CoinInfo>> {
 	println!("Request currencies {:?}", currencies);
 	Json(storage.get_ref().get_currencies_by_blockchains_and_symbols(currencies))
+}
+
+#[get("/health")]
+pub async fn health() -> HttpResponse {
+	HttpResponse::Ok().finish()
 }
 
 #[cfg(test)]
