@@ -10,6 +10,8 @@ use std::fmt;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
+use crate::price_updater::alerts;
+
 #[derive(Debug, Clone, Copy)]
 pub enum UpdateTxKind {
 	DarkOracle,
@@ -56,7 +58,7 @@ where
 						kind, receipt.transaction_hash, receipt.block_number,
 					);
 				} else {
-					on_tx_reverted(kind, &receipt);
+					on_tx_reverted(kind, &receipt).await;
 				}
 				break;
 			}
@@ -65,21 +67,26 @@ where
 				tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 			}
 			Err(e) => {
-				on_tx_error(kind, Box::new(e));
+				on_tx_error(kind, Box::new(e)).await;
 				break;
 			}
 		}
 	}
 }
 
-fn on_tx_reverted(kind: UpdateTxKind, receipt: &TransactionReceipt) {
-	error!(
+async fn on_tx_reverted(kind: UpdateTxKind, receipt: &TransactionReceipt) {
+	let message = format!(
 		"[{}] transaction REVERTED on-chain: tx_hash={:?}, block={:?}",
 		kind, receipt.transaction_hash, receipt.block_number,
 	);
+	error!("{}", message);
+
+	alerts::send_slack_alert(message).await;
 }
 
+async fn on_tx_error(kind: UpdateTxKind, err: Box<dyn Error + Send + Sync + 'static>) {
+	let message = format!("[{}] failed to confirm transaction: {:?}", kind, err);
+	error!("{}", message);
 
-fn on_tx_error(kind: UpdateTxKind, err: Box<dyn Error + Send + Sync + 'static>) {
-	error!("[{}] failed to confirm transaction: {:?}", kind, err);
+	alerts::send_slack_alert(message).await;
 }

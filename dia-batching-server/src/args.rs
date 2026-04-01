@@ -16,11 +16,11 @@ pub struct SupportedCurrencies(pub Vec<String>);
 #[clap(name = "dia-batching-server")]
 pub struct DiaApiArgs {
 	/// Iteration duration after one batch of requests
-	#[clap(short, long, env = "UPDATE_INTERVAL_SECONDS", default_value = "2")]
+	#[clap(short, long, env = "UPDATE_INTERVAL_SECONDS", default_value = "1")]
 	pub update_interval_seconds: u64,
 
 	/// How often (in seconds) to update Pyth price feeds on-chain
-	#[clap(long, env = "PYTH_UPDATE_INTERVAL_SECONDS", default_value = "60")]
+	#[clap(long, env = "PYTH_UPDATE_INTERVAL_SECONDS", default_value = "5")]
 	pub pyth_update_interval_seconds: u64,
 
 	/// Maximum allowed price divergence in basis points (default 50 bps)
@@ -40,4 +40,12 @@ pub struct DiaApiArgs {
 	/// The port to run the server on
 	#[clap(short, long, env = "PORT", default_value = "10000")]
 	pub port: u16,
+
+	/// Slack token for alerts
+	#[clap(long, env = "SLACK_TOKEN")]
+	pub slack_token: Option<String>,
+
+	/// Slack channel ID for alerts
+	#[clap(long, env = "SLACK_CHANNEL_ID")]
+	pub slack_channel_id: Option<String>,
 }

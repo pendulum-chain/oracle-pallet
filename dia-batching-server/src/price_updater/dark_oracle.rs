@@ -35,7 +35,7 @@ impl DarkOracleUpdater {
 		currencies: &Vec<CoinInfo>,
 		client: Arc<ChainClient>,
 	) -> Result<(B256, PriceData), Box<dyn Error + Send + Sync + 'static>> {
-		warn!("Starting DarkOracle contract price update...");
+		info!("Starting DarkOracle contract price update...");
 		
 		let oracle = DarkOracle::new(self.contract_address, &*client.provider);
 
@@ -88,7 +88,6 @@ impl DarkOracleUpdater {
 			.max_priority_fee_per_gas(priority_fee)
 			.nonce(nonce);
 
-		warn!("Sending DarkOracle transaction with gas limit: 10,000,000");
 		let pending_tx = call_builder.send().await?;
 		let tx_hash = *pending_tx.tx_hash();
 		info!("DarkOracle updatePriceFeeds tx hash: {:?}", tx_hash);
