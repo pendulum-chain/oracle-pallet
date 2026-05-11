@@ -27,19 +27,6 @@ impl fmt::Display for CustomError {
 }
 
 #[derive(Debug)]
-pub struct PolygonError(pub String);
-
-impl fmt::Display for PolygonError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let PolygonError(ref err_msg) = *self;
-		// Log the error message
-		log::error!("PolygonError: {}", err_msg);
-		// Write the error message to the formatter
-		write!(f, "{}", err_msg)
-	}
-}
-
-#[derive(Debug)]
 pub struct FastForexError(pub String);
 
 impl fmt::Display for FastForexError {
