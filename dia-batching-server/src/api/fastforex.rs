@@ -95,7 +95,7 @@ impl FastForexPriceApi {
 					let quotation = Quotation {
 						symbol: symbol.clone(),
 						name: symbol,
-						blockchain: Some("FIAT".to_string()),
+						blockchain: asset.blockchain.clone(),
 						price,
 						supply,
 						time,
@@ -195,9 +195,13 @@ impl FastForexClient {
 		)
 		.map_err(|e| FastForexError(format!("Failed to build URL: {}", e)))?;
 
+		let mut api_key_header = reqwest::header::HeaderValue::from_str(&self.api_key)
+			.map_err(|e| FastForexError(format!("Invalid FastForex API key header value: {}", e)))?;
+		api_key_header.set_sensitive(true);
+
 		let response = client
 			.get(url)
-			.header("X-API-KEY", &self.api_key)
+			.header("X-API-KEY", api_key_header)
 			.send()
 			.await
 			.map_err(|e| FastForexError(format!("Failed to send request: {}", e)))?;

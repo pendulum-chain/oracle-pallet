@@ -29,15 +29,15 @@ pub struct PriceApiImpl {
 	fastforex_price_api: FastForexPriceApi,
 }
 
-	impl PriceApiImpl {
-		pub fn new() -> Self {
-			Self {
-				coingecko_price_api: CoingeckoPriceApi::new_from_config(CoingeckoConfig::parse()),
-				custom_price_api: CustomPriceApi::new(),
-				fastforex_price_api: FastForexPriceApi::new_from_config(FastForexConfig::parse()),
-			}
+impl PriceApiImpl {
+	pub fn new() -> Self {
+		Self {
+			coingecko_price_api: CoingeckoPriceApi::new_from_config(CoingeckoConfig::parse()),
+			custom_price_api: CustomPriceApi::new(),
+			fastforex_price_api: FastForexPriceApi::new_from_config(FastForexConfig::parse()),
 		}
 	}
+}
 
 #[async_trait]
 impl PriceApi for PriceApiImpl {
