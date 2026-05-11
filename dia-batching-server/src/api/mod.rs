@@ -1,8 +1,8 @@
 use crate::api::coingecko::CoingeckoPriceApi;
 use crate::api::custom::CustomPriceApi;
-use crate::api::error::{CoingeckoError, CustomError, PolygonError};
-use crate::api::polygon::PolygonPriceApi;
-use crate::args::{CoingeckoConfig, PolygonConfig};
+use crate::api::error::{CoingeckoError, CustomError, FastForexError};
+use crate::api::fastforex::FastForexPriceApi;
+use crate::args::{CoingeckoConfig, FastForexConfig};
 use crate::types::Quotation;
 use crate::AssetSpecifier;
 use async_trait::async_trait;
@@ -12,7 +12,7 @@ mod binance;
 mod coingecko;
 mod custom;
 mod error;
-mod polygon;
+mod fastforex;
 
 #[async_trait]
 pub trait PriceApi {
@@ -25,19 +25,19 @@ pub trait PriceApi {
 
 pub struct PriceApiImpl {
 	coingecko_price_api: CoingeckoPriceApi,
-	polygon_price_api: PolygonPriceApi,
 	custom_price_api: CustomPriceApi,
+	fastforex_price_api: FastForexPriceApi,
 }
 
-impl PriceApiImpl {
-	pub fn new() -> Self {
-		Self {
-			coingecko_price_api: CoingeckoPriceApi::new_from_config(CoingeckoConfig::parse()),
-			polygon_price_api: PolygonPriceApi::new_from_config(PolygonConfig::parse()),
-			custom_price_api: CustomPriceApi::new(),
+	impl PriceApiImpl {
+		pub fn new() -> Self {
+			Self {
+				coingecko_price_api: CoingeckoPriceApi::new_from_config(CoingeckoConfig::parse()),
+				custom_price_api: CustomPriceApi::new(),
+				fastforex_price_api: FastForexPriceApi::new_from_config(FastForexConfig::parse()),
+			}
 		}
 	}
-}
 
 #[async_trait]
 impl PriceApi for PriceApiImpl {
@@ -61,7 +61,7 @@ impl PriceApi for PriceApiImpl {
 		let fiat_assets: Vec<_> = assets
 			.clone()
 			.into_iter()
-			.filter(|asset| PolygonPriceApi::is_supported(asset))
+			.filter(|asset| FastForexPriceApi::is_supported(asset))
 			.collect();
 
 		let fiat_quotes = self.get_fiat_quotations(fiat_assets.clone()).await;
@@ -89,8 +89,8 @@ impl PriceApiImpl {
 	async fn get_fiat_quotations(
 		&self,
 		assets: Vec<&AssetSpecifier>,
-	) -> Result<Vec<Quotation>, PolygonError> {
-		let quotations = self.polygon_price_api.get_prices(assets).await?;
+	) -> Result<Vec<Quotation>, FastForexError> {
+		let quotations = self.fastforex_price_api.get_prices(assets).await?;
 		Ok(quotations)
 	}
 

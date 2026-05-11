@@ -36,7 +36,7 @@ pub struct DiaApiArgs {
 	#[clap(flatten)]
 	pub coingecko_config: CoingeckoConfig,
 	#[clap(flatten)]
-	pub polygon_config: PolygonConfig,
+	pub fastforex_config: FastForexConfig,
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -52,12 +52,12 @@ pub struct CoingeckoConfig {
 }
 
 #[derive(Parser, Debug, Clone)]
-pub struct PolygonConfig {
-	/// The API key for Polygon.io
-	#[clap(long, env = "PG_API_KEY")]
-	pub pg_api_key: Option<String>,
+pub struct FastForexConfig {
+	/// The API key for FastForex
+	#[clap(long, env = "FF_API_KEY")]
+	pub ff_api_key: Option<String>,
 
-	/// The host URL for the Polygon.io API.
-	#[clap(long, env = "PG_HOST_URL", default_value = "https://api.polygon.io")]
-	pub pg_host_url: String,
+	/// The host URL for the FastForex API.
+	#[clap(long, env = "FF_HOST_URL", default_value = "https://api.fastforex.io")]
+	pub ff_host_url: String,
 }

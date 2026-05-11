@@ -40,6 +40,19 @@ impl fmt::Display for PolygonError {
 }
 
 #[derive(Debug)]
+pub struct FastForexError(pub String);
+
+impl fmt::Display for FastForexError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		let FastForexError(ref err_msg) = *self;
+		// Log the error message
+		log::error!("FastForexError: {}", err_msg);
+		// Write the error message to the formatter
+		write!(f, "{}", err_msg)
+	}
+}
+
+#[derive(Debug)]
 pub struct BinanceError(pub String);
 
 impl fmt::Display for BinanceError {
