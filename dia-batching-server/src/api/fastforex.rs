@@ -286,4 +286,100 @@ mod tests {
 		assert_eq!(eur_price.blockchain, Some("FIAT".to_string()));
 		assert!(eur_price.price > 0.into());
 	}
+
+	#[tokio::test]
+	async fn test_all_fiat_pairs() {
+		let (api_key, host_url) = get_fastforex_variables();
+		let price_api = FastForexPriceApi::new(host_url.clone(), api_key.clone());
+
+		let fiat_pairs = vec![
+			"USD-USD",
+			"EUR-USD",
+			"BRL-USD",
+			"AUD-USD",
+			"NGN-USD",
+			"TZS-USD",
+			"PEN-USD",
+			"ARS-USD",
+		];
+
+		let assets: Vec<AssetSpecifier> = fiat_pairs
+			.iter()
+			.map(|pair| AssetSpecifier {
+				blockchain: "FIAT".to_string(),
+				symbol: pair.to_string(),
+			})
+			.collect();
+
+		let asset_refs: Vec<&AssetSpecifier> = assets.iter().collect();
+		let result = price_api.get_prices(asset_refs).await;
+
+		println!("Result: {:?}", result);
+
+		match result {
+			Ok(quotations) => {
+				println!("Successfully retrieved {} quotations:", quotations.len());
+				for q in &quotations {
+					println!("  - {} (price: {})", q.symbol, q.price);
+				}
+
+				let returned_symbols: Vec<&str> =
+					quotations.iter().map(|q| q.symbol.as_str()).collect();
+
+				for pair in &fiat_pairs {
+					if returned_symbols.contains(pair) {
+						println!("✓ {} - SUPPORTED", pair);
+					} else {
+						println!("✗ {} - NOT SUPPORTED or returned", pair);
+					}
+				}
+			},
+			Err(e) => {
+				println!("Error: {}", e);
+			},
+		}
+	}
+
+	#[tokio::test]
+	async fn test_individual_fiat_pairs() {
+		let (api_key, host_url) = get_fastforex_variables();
+
+		let fiat_pairs = vec![
+			"USD-USD",
+			"EUR-USD",
+			"BRL-USD",
+			"AUD-USD",
+			"NGN-USD",
+			"TZS-USD",
+			"PEN-USD",
+			"ARS-USD",
+		];
+
+		for pair in fiat_pairs {
+			let price_api = FastForexPriceApi::new(host_url.clone(), api_key.clone());
+			let asset = AssetSpecifier {
+				blockchain: "FIAT".to_string(),
+				symbol: pair.to_string(),
+			};
+
+			let is_supported = FastForexPriceApi::is_supported(&asset);
+			let ticker = FastForexPriceApi::convert_to_pair(&asset);
+
+			let result = price_api.get_prices(vec![&asset]).await;
+			let status = match &result {
+				Ok(qs) if !qs.is_empty() => "✓ WORKS",
+				Ok(_) => "✗ EMPTY",
+				Err(_) => "✗ ERROR",
+			};
+
+			println!(
+				"{} | symbol: {} | ticker: {:?} | supported: {} | result: {:?}",
+				status,
+				pair,
+				ticker,
+				is_supported,
+				result.map(|qs| qs.len())
+			);
+		}
+	}
 }
